@@ -152,12 +152,14 @@ async function upsertSummaryMessage(
 ): Promise<void> {
   const supabase = await createClient();
 
+  // Query for existing summary message using JSONB path query
   const { data: existing, error: fetchError } = await supabase
     .from("messages")
     .select("*")
     .eq("conversation_id", conversationId)
     .eq("user_id", userId)
-    .contains("metadata", { type: "summary" })
+    .eq("role", "system")
+    .filter("metadata->>type", "eq", "summary")
     .limit(1)
     .maybeSingle();
 
@@ -275,6 +277,11 @@ export async function getConversationHistory(options: ConversationHistoryOptions
   } = options;
 
   const allMessages = await fetchConversationMessages(conversationId, userId);
+  
+  // Debug logging (can be removed in production)
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[Memory] Fetching history for conversation ${conversationId}: ${allMessages.length} total messages`);
+  }
 
   const summaryCandidates = allMessages.filter((msg) => msg.metadata?.type === "summary");
   const summaryMessage =
@@ -332,12 +339,17 @@ export async function getConversationHistory(options: ConversationHistoryOptions
     }))
   );
 
+  // Debug logging (can be removed in production)
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[Memory] Returning ${historyMessages.length} messages (${selection.kept.length} from history, ${summaryMessage ? "1 summary" : "no summary"}), ${tokensUsed} tokens used, ${Math.max(0, unsummarizedMessages.length - selection.kept.length)} truncated`);
+  }
+
   return {
     messages: historyMessages,
     summaryIncluded: Boolean(summaryMessage),
     summaryText: summaryMessage?.content ?? null,
     tokensUsed,
-    truncatedMessages: conversationMessages.length - selection.kept.length,
+    truncatedMessages: Math.max(0, unsummarizedMessages.length - selection.kept.length),
   };
 }
 

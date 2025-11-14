@@ -122,6 +122,18 @@ export async function POST(request: NextRequest) {
         const encoder = new TextEncoder();
 
           try {
+            // Emit conversation ID if this is a new conversation
+            if (!conversationId) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "conversation",
+                    conversationId: convId,
+                  })}\n\n`
+                )
+              );
+            }
+
             // Emit memory metadata if we have it
             if (historyContext.summaryIncluded || historyContext.truncatedMessages > 0) {
               controller.enqueue(
