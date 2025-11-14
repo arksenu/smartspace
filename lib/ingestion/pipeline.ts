@@ -46,6 +46,14 @@ export async function processDocument(documentId: string, userId: string) {
     } else if (document.file_type === "url") {
       text = document.metadata?.content || "";
       metadata = { url: document.metadata?.url };
+      
+      // Validate URL content
+      if (!text || text.trim().length < 50) {
+        throw new Error(
+          `Insufficient content extracted from URL (${text?.length || 0} characters). ` +
+          `The page may be JavaScript-rendered and require a headless browser to extract content.`
+        );
+      }
     } else if (document.file_type === "txt") {
       const { data: fileData, error: downloadError } = await supabase.storage
         .from("documents")
@@ -60,11 +68,23 @@ export async function processDocument(documentId: string, userId: string) {
       throw new Error(`Unsupported file type: ${document.file_type}`);
     }
 
+    // Validate text before chunking
+    if (!text || text.trim().length === 0) {
+      throw new Error(
+        `Document contains no extractable text content. ` +
+        `For URL documents, the page may be JavaScript-rendered and require a headless browser.`
+      );
+    }
+
     // Chunk text
     const chunks = chunkText(text);
 
     if (chunks.length === 0) {
-      throw new Error("No chunks generated from document");
+      throw new Error(
+        `No chunks generated from document. ` +
+        `Content length: ${text.length} characters. ` +
+        `This may indicate the content extraction failed or the document is empty.`
+      );
     }
 
     // Generate embeddings
