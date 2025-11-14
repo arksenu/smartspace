@@ -1,42 +1,47 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useImperativeHandle, forwardRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, File, X } from "lucide-react";
 
 interface UploadZoneProps {
-  onFilesSelected: (files: File[]) => void;
   maxSize?: number; // in bytes
   accept?: Record<string, string[]>;
 }
 
-export function UploadZone({
-  onFilesSelected,
-  maxSize = 10 * 1024 * 1024, // 10MB default
-  accept = { "application/pdf": [".pdf"], "text/plain": [".txt"] },
-}: UploadZoneProps) {
-  const [files, setFiles] = useState<File[]>([]);
+export interface UploadZoneRef {
+  getFiles: () => File[];
+  clearFiles: () => void;
+}
 
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      const validFiles = acceptedFiles.filter((file) => file.size <= maxSize);
-      setFiles((prev) => [...prev, ...validFiles]);
-      onFilesSelected(validFiles);
-    },
-    [maxSize, onFilesSelected]
-  );
+export const UploadZone = forwardRef<UploadZoneRef, UploadZoneProps>(
+  ({ maxSize = 10 * 1024 * 1024, accept = { "application/pdf": [".pdf"], "text/plain": [".txt"] } }, ref) => {
+    const [files, setFiles] = useState<File[]>([]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept,
-    maxSize,
-  });
+    useImperativeHandle(ref, () => ({
+      getFiles: () => files,
+      clearFiles: () => setFiles([]),
+    }));
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+    const onDrop = useCallback(
+      (acceptedFiles: File[]) => {
+        const validFiles = acceptedFiles.filter((file) => file.size <= maxSize);
+        setFiles((prev) => [...prev, ...validFiles]);
+      },
+      [maxSize]
+    );
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+      onDrop,
+      accept,
+      maxSize,
+    });
+
+    const removeFile = (index: number) => {
+      setFiles((prev) => prev.filter((_, i) => i !== index));
+    };
 
   return (
     <div className="space-y-4">
@@ -96,5 +101,7 @@ export function UploadZone({
       )}
     </div>
   );
-}
+});
+
+UploadZone.displayName = "UploadZone";
 

@@ -37,11 +37,16 @@ export async function vectorSearch(
 
   if (error) {
     // Fallback to manual similarity search if RPC function doesn't exist
-    const { data: chunks, error: chunksError } = await supabase
+    let chunksQuery = supabase
       .from("document_chunks")
       .select("*")
-      .eq("user_id", userId)
-      .limit(topK * 2);
+      .eq("user_id", userId);
+
+    if (documentId) {
+      chunksQuery = chunksQuery.eq("document_id", documentId);
+    }
+
+    const { data: chunks, error: chunksError } = await chunksQuery.limit(topK * 2);
 
     if (chunksError || !chunks) {
       throw new Error(`Vector search failed: ${chunksError?.message || "Unknown error"}`);

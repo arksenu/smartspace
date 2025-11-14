@@ -7,6 +7,7 @@ import { getConversationHistory } from "@/lib/chat/memory";
 import { saveMessage } from "@/lib/chat/save-message";
 import { streamChatCompletion } from "@/lib/llm";
 import { logEval } from "@/lib/analytics/logger";
+import { getSettings } from "@/app/actions/settings/update";
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -14,7 +15,14 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   try {
-    const { conversationId, message, provider = "openai", model, temperature } = await request.json();
+    // Load user settings as defaults
+    const userSettings = await getSettings();
+    const defaultProvider = userSettings?.provider || "openai";
+    const defaultModel = userSettings?.model || "gpt-4-turbo-preview";
+    const defaultTemperature = userSettings?.temperature ?? 0.7;
+    const defaultSystemPrompt = userSettings?.systemPrompt;
+
+    const { conversationId, message, provider = defaultProvider, model = defaultModel, temperature = defaultTemperature } = await request.json();
 
     if (!message) {
       return new Response(JSON.stringify({ error: "Message is required" }), {
@@ -33,7 +41,8 @@ export async function POST(request: NextRequest) {
           title: message.substring(0, 50),
           model_provider: provider,
           model_name: model,
-          temperature: temperature ?? 0.7,
+          temperature: temperature,
+          system_prompt: defaultSystemPrompt,
         })
         .select()
         .single();
@@ -51,8 +60,9 @@ export async function POST(request: NextRequest) {
     // Get conversation history
     const history = await getConversationHistory(convId, user.id, 10);
 
-    // Build prompt
+    // Build prompt with user's system prompt if available
     const messages = buildPrompt({
+      systemPrompt: defaultSystemPrompt,
       contextChunks: searchResults,
       conversationHistory: history.map((h) => ({
         role: h.role,

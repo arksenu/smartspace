@@ -13,7 +13,7 @@ interface Document {
   fileType: string | null;
   fileSize: number | null;
   status: "pending" | "processing" | "completed" | "failed";
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 interface DocumentListProps {
@@ -67,7 +67,12 @@ export function DocumentList({ documents, onDelete, onReindex }: DocumentListPro
           <CardContent>
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Uploaded {formatDistanceToNow(new Date(doc.createdAt), { addSuffix: true })}
+                {(() => {
+                  if (!doc.createdAt) return <>Uploaded recently</>;
+                  const date = new Date(doc.createdAt);
+                  if (isNaN(date.getTime())) return <>Uploaded recently</>;
+                  return <>Uploaded {formatDistanceToNow(date, { addSuffix: true })}</>;
+                })()}
               </p>
               <div className="flex gap-2">
                 {doc.status === "failed" && onReindex && (

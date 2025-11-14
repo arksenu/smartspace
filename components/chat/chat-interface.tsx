@@ -22,6 +22,7 @@ export function ChatInterface({ conversationId, initialMessages = [] }: ChatInte
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [sources, setSources] = useState<Array<{ chunkId: string; content: string; similarity: number }>>([]);
   const [streaming, setStreaming] = useState(false);
+  const [userSettings, setUserSettings] = useState<{ provider?: string; model?: string; temperature?: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -31,6 +32,20 @@ export function ChatInterface({ conversationId, initialMessages = [] }: ChatInte
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Load user settings
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.settings) {
+          setUserSettings(data.settings);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load settings:", error);
+      });
+  }, []);
 
   const handleSend = async (message: string) => {
     // Add user message
@@ -49,7 +64,9 @@ export function ChatInterface({ conversationId, initialMessages = [] }: ChatInte
         body: JSON.stringify({
           conversationId,
           message,
-          provider: "openai",
+          provider: userSettings?.provider || "openai",
+          model: userSettings?.model,
+          temperature: userSettings?.temperature,
         }),
       });
 

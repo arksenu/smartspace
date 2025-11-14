@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/auth/require-auth";
 import { createClient } from "@/lib/supabase/server";
 import { DocumentList } from "@/components/documents/document-list";
 import { UploadDocumentButton } from "@/components/documents/upload-document-button";
+import { DocumentsPageClient } from "./documents-client";
 
 export default async function DocumentsPage() {
   const user = await requireAuth();
@@ -25,8 +26,7 @@ export default async function DocumentsPage() {
         <UploadDocumentButton />
       </div>
 
-      <DocumentList documents={documents || []} />
+      <DocumentsPageClient documents={documents || []} />
     </div>
   );
 }
-

@@ -1,24 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import { saveSettings, getSettings } from "@/app/actions/settings/update";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const DEFAULT_SETTINGS = {
+  provider: "openai",
+  model: "gpt-4-turbo-preview",
+  temperature: 0.7,
+  systemPrompt: "",
+};
 
 export default function SettingsPage() {
-  const [provider, setProvider] = useState("openai");
-  const [model, setModel] = useState("gpt-4-turbo-preview");
-  const [temperature, setTemperature] = useState([0.7]);
-  const [systemPrompt, setSystemPrompt] = useState("");
+  const [provider, setProvider] = useState(DEFAULT_SETTINGS.provider);
+  const [model, setModel] = useState(DEFAULT_SETTINGS.model);
+  const [temperature, setTemperature] = useState([DEFAULT_SETTINGS.temperature]);
+  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SETTINGS.systemPrompt);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    // TODO: Save settings to database
-    toast.success("Settings saved");
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await getSettings();
+      if (settings) {
+        setProvider(settings.provider || DEFAULT_SETTINGS.provider);
+        setModel(settings.model || DEFAULT_SETTINGS.model);
+        setTemperature([settings.temperature ?? DEFAULT_SETTINGS.temperature]);
+        setSystemPrompt(settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt);
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveSettings({
+        provider,
+        model,
+        temperature: temperature[0],
+        systemPrompt,
+      });
+      toast.success("Settings saved successfully");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div>
+          <Skeleton className="h-10 w-48 mb-2" />
+          <Skeleton className="h-5 w-96" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -79,17 +145,20 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Prompt</Label>
-            <Input
+            <Textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder="Enter custom system prompt..."
+              rows={6}
+              className="resize-none"
             />
           </div>
         </CardContent>
       </Card>
 
-      <Button onClick={handleSave}>Save Settings</Button>
+      <Button onClick={handleSave} disabled={saving}>
+        {saving ? "Saving..." : "Save Settings"}
+      </Button>
     </div>
   );
 }
-

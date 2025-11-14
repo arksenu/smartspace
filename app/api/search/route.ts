@@ -5,7 +5,7 @@ import { vectorSearch } from "@/lib/vector/search";
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth();
-    const { query, topK = 10 } = await request.json();
+    const { query, topK = 10, documentId } = await request.json();
 
     if (!query) {
       return NextResponse.json(
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = await vectorSearch(query, user.id, topK);
+    const results = await vectorSearch(query, user.id, topK, documentId);
 
     return NextResponse.json({ results });
   } catch (error) {

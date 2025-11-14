@@ -1,4 +1,4 @@
-import pdf from "pdf-parse";
+const pdfParse = require("pdf-parse-new");
 
 export interface ParsedPDF {
   text: string;
@@ -12,8 +12,9 @@ export interface ParsedPDF {
 
 export async function parsePDF(buffer: Buffer): Promise<ParsedPDF> {
   try {
-    const data = await pdf(buffer);
-
+    // Parse PDF using pdf-parse-new
+    const data = await pdfParse(buffer);
+    
     return {
       text: data.text,
       metadata: {

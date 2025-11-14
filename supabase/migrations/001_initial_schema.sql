@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   email TEXT NOT NULL,
   full_name TEXT,
   avatar_url TEXT,
+  settings JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );

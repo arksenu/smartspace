@@ -5,9 +5,14 @@ import { requireAuth } from "@/lib/auth/require-auth";
 import { revalidatePath } from "next/cache";
 import { ingestUrl as ingestUrlContent } from "@/lib/ingestion/url-ingestion";
 
-export async function uploadDocument(file: File, userId?: string) {
-  const user = userId ? { id: userId } : await requireAuth();
+export async function uploadDocument(formData: FormData) {
+  const user = await requireAuth();
   const supabase = await createClient();
+
+  const file = formData.get("file") as File;
+  if (!file) {
+    throw new Error("No file provided");
+  }
 
   // Generate unique filename
   const fileExt = file.name.split(".").pop();
@@ -48,6 +53,16 @@ export async function uploadDocument(file: File, userId?: string) {
   }
 
   revalidatePath("/documents");
+
+  // Trigger ingestion pipeline automatically (non-blocking)
+  // Use dynamic import to avoid loading PDF parsing libraries during module initialization
+  import("@/lib/ingestion/pipeline").then(({ processDocument }) => {
+    processDocument(document.id, user.id).catch((error) => {
+      // Don't fail upload if ingestion fails - it can be retried manually
+      console.error("Failed to process document:", error);
+    });
+  });
+
   return document;
 }
 
@@ -79,6 +94,15 @@ export async function ingestUrl(url: string) {
   }
 
   revalidatePath("/documents");
+
+  // Trigger ingestion pipeline automatically for URLs (non-blocking)
+  // Use dynamic import to avoid loading PDF parsing libraries during module initialization
+  import("@/lib/ingestion/pipeline").then(({ processDocument }) => {
+    processDocument(document.id, user.id).catch((error) => {
+      console.error("Failed to process document:", error);
+    });
+  });
+
   return document;
 }
 

@@ -1,5 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -26,5 +28,46 @@ export async function createClient() {
       },
     }
   );
+}
+
+// Service role client for server-side operations that need to bypass RLS
+// Use with caution - always validate user permissions first!
+export function createServiceRoleClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+// Helper for API routes that need to use request cookies and set response cookies
+export function createClientFromRequest(request: NextRequest, response?: NextResponse) {
+  let responseToUse = response || NextResponse.next({ request });
+  
+  return {
+    client: createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              request.cookies.set(name, value);
+              responseToUse.cookies.set(name, value, options);
+            });
+          },
+        },
+      }
+    ),
+    response: responseToUse,
+  };
 }
 

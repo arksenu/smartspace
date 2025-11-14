@@ -1,4 +1,4 @@
-import { encode } from "tiktoken";
+import { get_encoding } from "tiktoken";
 
 export interface Chunk {
   content: string;
@@ -27,7 +27,7 @@ export function chunkText(
   options: ChunkingOptions = {}
 ): Chunk[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const encoding = encode(opts.encoding);
+  const encoding = get_encoding(opts.encoding);
 
   // Split text into sentences first
   const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
