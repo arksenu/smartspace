@@ -43,18 +43,10 @@ const SUMMARY_TRIGGER_MIN_MESSAGES = 12;
 const SUMMARY_RECENT_MESSAGES_TO_KEEP = 6;
 const SUMMARY_MAX_TOKENS = 400;
 
-let encoder: ReturnType<typeof get_encoding> | null = null;
-
-function ensureEncoder(encoding: TiktokenEncoding = "cl100k_base") {
-  if (!encoder) {
-    encoder = get_encoding(encoding);
-  }
-  return encoder;
-}
-
-function countTokens(text: string): number {
-  const enc = ensureEncoder();
-  const tokens = enc.encode(text);
+function countTokens(text: string, encodingName: TiktokenEncoding = "cl100k_base"): number {
+  const encoding = get_encoding(encodingName);
+  const tokens = encoding.encode(text);
+  encoding.free();
   return tokens.length;
 }
 
@@ -277,7 +269,7 @@ export async function getConversationHistory(options: ConversationHistoryOptions
   } = options;
 
   const allMessages = await fetchConversationMessages(conversationId, userId);
-  
+
   // Debug logging (can be removed in production)
   if (process.env.NODE_ENV === "development") {
     console.log(`[Memory] Fetching history for conversation ${conversationId}: ${allMessages.length} total messages`);
@@ -287,8 +279,8 @@ export async function getConversationHistory(options: ConversationHistoryOptions
   const summaryMessage =
     summaryCandidates.length > 0
       ? summaryCandidates.reduce((latest, current) =>
-          current.createdAt > latest.createdAt ? current : latest
-        )
+        current.createdAt > latest.createdAt ? current : latest
+      )
       : undefined;
 
   const conversationMessages = allMessages.filter((msg) => msg.metadata?.type !== "summary");
@@ -380,8 +372,8 @@ export async function updateConversationSummary(options: UpdateConversationSumma
   const summaryMessage =
     summaryCandidates.length > 0
       ? summaryCandidates.reduce((latest, current) =>
-          current.createdAt > latest.createdAt ? current : latest
-        )
+        current.createdAt > latest.createdAt ? current : latest
+      )
       : undefined;
 
   const conversationMessages = allMessages.filter((msg) => msg.metadata?.type !== "summary");
