@@ -18,6 +18,28 @@ function countTokens(text: string, encodingName: TiktokenEncoding = "cl100k_base
   return tokens.length;
 }
 
+// Helper function to count tokens for messages array
+// Counts only the actual message content (role + content), not JSON syntax
+// This matches how LLM APIs tokenize messages internally
+function countMessageTokens(messages: Array<{ role: string; content: string }>, encodingName: TiktokenEncoding = "cl100k_base"): number {
+  const encoding = get_encoding(encodingName);
+  let totalTokens = 0;
+
+  for (const message of messages) {
+    // Count role name tokens (e.g., "user", "assistant", "system")
+    const roleTokens = encoding.encode(message.role);
+    // Count content tokens
+    const contentTokens = encoding.encode(message.content);
+    // Most LLM APIs format messages internally, typically as "role\ncontent" or "role: content"
+    // We count role + content tokens, which is accurate and avoids counting JSON syntax
+    // The +2 accounts for typical formatting overhead (newline/separator between role and content)
+    totalTokens += roleTokens.length + contentTokens.length + 2;
+  }
+
+  encoding.free();
+  return totalTokens;
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const user = await requireAuth();
@@ -40,71 +62,71 @@ export async function POST(request: NextRequest) {
       });
     }
 
-      // Get or create conversation
-      let convId: string;
-      let conversationMeta: { use_memory?: boolean | null; system_prompt?: string | null } | null = null;
+    // Get or create conversation
+    let convId: string;
+    let conversationMeta: { use_memory?: boolean | null; system_prompt?: string | null } | null = null;
 
-      if (!conversationId) {
-        const { data: newConv, error: convError } = await supabase
-          .from("conversations")
-          .insert({
-            user_id: user.id,
-            title: message.substring(0, 50),
-            model_provider: provider,
-            model_name: model,
-            temperature: temperature,
-            system_prompt: defaultSystemPrompt,
-          })
-          .select()
-          .single();
+    if (!conversationId) {
+      const { data: newConv, error: convError } = await supabase
+        .from("conversations")
+        .insert({
+          user_id: user.id,
+          title: message.substring(0, 50),
+          model_provider: provider,
+          model_name: model,
+          temperature: temperature,
+          system_prompt: defaultSystemPrompt,
+        })
+        .select()
+        .single();
 
-        if (convError) {
-          throw new Error(`Failed to create conversation: ${convError.message}`);
-        }
-
-        convId = newConv.id;
-        conversationMeta = newConv;
-      } else {
-        convId = conversationId;
-        const { data: existingConv, error: fetchConvError } = await supabase
-          .from("conversations")
-          .select("use_memory, system_prompt")
-          .eq("id", convId)
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (fetchConvError) {
-          throw new Error(`Failed to load conversation settings: ${fetchConvError.message}`);
-        }
-
-        if (!existingConv) {
-          throw new Error("Conversation not found for the current user.");
-        }
-
-        conversationMeta = existingConv;
+      if (convError) {
+        throw new Error(`Failed to create conversation: ${convError.message}`);
       }
 
-      const useMemory = conversationMeta?.use_memory ?? true;
-      const activeSystemPrompt = conversationMeta?.system_prompt ?? defaultSystemPrompt;
+      convId = newConv.id;
+      conversationMeta = newConv;
+    } else {
+      convId = conversationId;
+      const { data: existingConv, error: fetchConvError } = await supabase
+        .from("conversations")
+        .select("use_memory, system_prompt")
+        .eq("id", convId)
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      // Retrieve relevant chunks
-      const searchResults = await vectorSearch(message, user.id, 5);
+      if (fetchConvError) {
+        throw new Error(`Failed to load conversation settings: ${fetchConvError.message}`);
+      }
 
-      // Get conversation history
-      const historyContext = await getConversationHistory({
-        conversationId: convId,
-        userId: user.id,
-        useMemory,
-        model,
-      });
+      if (!existingConv) {
+        throw new Error("Conversation not found for the current user.");
+      }
 
-      // Build prompt with user's system prompt if available
-      const messages = buildPrompt({
-        systemPrompt: activeSystemPrompt,
-        contextChunks: searchResults,
-        conversationHistory: historyContext.messages,
-        userQuery: message,
-      });
+      conversationMeta = existingConv;
+    }
+
+    const useMemory = conversationMeta?.use_memory ?? true;
+    const activeSystemPrompt = conversationMeta?.system_prompt ?? defaultSystemPrompt;
+
+    // Retrieve relevant chunks
+    const searchResults = await vectorSearch(message, user.id, 5);
+
+    // Get conversation history
+    const historyContext = await getConversationHistory({
+      conversationId: convId,
+      userId: user.id,
+      useMemory,
+      model,
+    });
+
+    // Build prompt with user's system prompt if available
+    const messages = buildPrompt({
+      systemPrompt: activeSystemPrompt,
+      contextChunks: searchResults,
+      conversationHistory: historyContext.messages,
+      userQuery: message,
+    });
 
     // Save user message
     await saveMessage({
@@ -121,35 +143,35 @@ export async function POST(request: NextRequest) {
         let fullResponse = "";
         const encoder = new TextEncoder();
 
-          try {
-            // Emit conversation ID if this is a new conversation
-            if (!conversationId) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "conversation",
-                    conversationId: convId,
-                  })}\n\n`
-                )
-              );
-            }
+        try {
+          // Emit conversation ID if this is a new conversation
+          if (!conversationId) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "conversation",
+                  conversationId: convId,
+                })}\n\n`
+              )
+            );
+          }
 
-            // Emit memory metadata if we have it
-            if (historyContext.summaryIncluded || historyContext.truncatedMessages > 0) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "memory",
-                    summaryIncluded: historyContext.summaryIncluded,
-                    truncatedMessages: historyContext.truncatedMessages,
-                    tokensUsed: historyContext.tokensUsed,
-                    summary: historyContext.summaryText ?? undefined,
-                  })}\n\n`
-                )
-              );
-            }
+          // Emit memory metadata if we have it
+          if (historyContext.summaryIncluded || historyContext.truncatedMessages > 0) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "memory",
+                  summaryIncluded: historyContext.summaryIncluded,
+                  truncatedMessages: historyContext.truncatedMessages,
+                  tokensUsed: historyContext.tokensUsed,
+                  summary: historyContext.summaryText ?? undefined,
+                })}\n\n`
+              )
+            );
+          }
 
-            // Send sources first
+          // Send sources first
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -163,11 +185,11 @@ export async function POST(request: NextRequest) {
             )
           );
 
-            for await (const chunk of streamChatCompletion(
-              provider as LLMProvider,
-              messages,
-              { model, temperature }
-            )) {
+          for await (const chunk of streamChatCompletion(
+            provider as LLMProvider,
+            messages,
+            { model, temperature }
+          )) {
             fullResponse += chunk.content;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
           }
@@ -175,8 +197,8 @@ export async function POST(request: NextRequest) {
           // Save assistant message
           const latencyMs = Date.now() - startTime;
 
-          // Count tokens accurately
-          const inputTokens = countTokens(JSON.stringify(messages));
+          // Count tokens accurately - only count actual message content, not JSON syntax
+          const inputTokens = countMessageTokens(messages);
           const outputTokens = countTokens(fullResponse);
 
           await saveMessage({
@@ -201,16 +223,16 @@ export async function POST(request: NextRequest) {
             latencyMs,
           });
 
-            if (useMemory) {
-              updateConversationSummary({
-                conversationId: convId,
-                userId: user.id,
-                provider: provider as LLMProvider,
-                model,
-              }).catch((err) => {
-                console.error("Failed to update conversation summary", err);
-              });
-            }
+          if (useMemory) {
+            updateConversationSummary({
+              conversationId: convId,
+              userId: user.id,
+              provider: provider as LLMProvider,
+              model,
+            }).catch((err) => {
+              console.error("Failed to update conversation summary", err);
+            });
+          }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
