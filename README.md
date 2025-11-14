@@ -58,9 +58,10 @@ Fill in your environment variables:
 
 4. Set up Supabase:
    - Create a new Supabase project
-   - Run the SQL migration from `supabase/migrations/001_initial_schema.sql` in the Supabase SQL editor
-   - Enable PGVector extension
-   - Create a storage bucket named `documents` with public access
+   - Run the SQL migrations in order from the `supabase/migrations/` directory in the Supabase SQL editor:
+     - `001_initial_schema.sql` - Database tables and RLS policies
+     - `002_storage_bucket_policies.sql` - Storage bucket and RLS policies
+   - Note: PGVector extension is automatically enabled by the migration
 
 5. Run the development server:
 ```bash
