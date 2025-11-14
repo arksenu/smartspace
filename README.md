@@ -6,6 +6,7 @@ A production-grade, AI-powered web application for document ingestion, semantic 
 
 - **Document Management**: Upload PDFs, text files, or ingest content from URLs
 - **AI-Powered Chat**: Chat with your documents using RAG (Retrieval-Augmented Generation)
+- **Adaptive Chat Memory**: Automatically summarizes long conversations and optimizes context windows to stay within model limits
 - **Semantic Search**: Search across your documents using vector similarity
 - **Multi-Provider LLM Support**: OpenAI, Anthropic, and Groq
 - **Analytics Dashboard**: Track usage, tokens, and performance metrics

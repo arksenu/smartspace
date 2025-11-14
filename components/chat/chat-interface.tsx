@@ -18,10 +18,11 @@ interface ChatInterfaceProps {
   initialMessages?: Message[];
 }
 
-export function ChatInterface({ conversationId, initialMessages = [] }: ChatInterfaceProps) {
+export function ChatInterface({ conversationId: initialConversationId, initialMessages = [] }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [sources, setSources] = useState<Array<{ chunkId: string; content: string; similarity: number }>>([]);
   const [streaming, setStreaming] = useState(false);
+  const [conversationId, setConversationId] = useState<string | undefined>(initialConversationId);
   const [userSettings, setUserSettings] = useState<{ provider?: string; model?: string; temperature?: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +104,12 @@ export function ChatInterface({ conversationId, initialMessages = [] }: ChatInte
 
             try {
               const parsed = JSON.parse(data);
+              
+              // Handle conversation ID (for new conversations)
+              if (parsed.type === "conversation" && parsed.conversationId) {
+                setConversationId(parsed.conversationId);
+                continue;
+              }
               
               // Handle sources
               if (parsed.type === "sources" && parsed.sources) {
