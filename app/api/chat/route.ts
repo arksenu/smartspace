@@ -8,6 +8,15 @@ import { saveMessage } from "@/lib/chat/save-message";
 import { streamChatCompletion } from "@/lib/llm";
 import { logEval } from "@/lib/analytics/logger";
 import { getSettings } from "@/app/actions/settings/update";
+import { get_encoding, TiktokenEncoding } from "tiktoken";
+
+// Helper function to count tokens accurately
+function countTokens(text: string, encodingName: TiktokenEncoding = "cl100k_base"): number {
+  const encoding = get_encoding(encodingName);
+  const tokens = encoding.encode(text);
+  encoding.free();
+  return tokens.length;
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -87,6 +96,20 @@ export async function POST(request: NextRequest) {
         const encoder = new TextEncoder();
 
         try {
+          // Send sources first
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "sources",
+                sources: searchResults.map((r) => ({
+                  chunkId: r.chunkId,
+                  content: r.content,
+                  similarity: r.similarity,
+                })),
+              })}\n\n`
+            )
+          );
+
           for await (const chunk of streamChatCompletion(
             provider as "openai" | "anthropic" | "groq",
             messages,
@@ -98,13 +121,18 @@ export async function POST(request: NextRequest) {
 
           // Save assistant message
           const latencyMs = Date.now() - startTime;
+
+          // Count tokens accurately
+          const inputTokens = countTokens(JSON.stringify(messages));
+          const outputTokens = countTokens(fullResponse);
+
           await saveMessage({
             conversationId: convId,
             userId: user.id,
             role: "assistant",
             content: fullResponse,
             retrievedChunkIds: searchResults.map((r) => r.chunkId),
-            tokensUsed: fullResponse.split(/\s+/).length * 1.3, // Rough estimate
+            tokensUsed: outputTokens,
             modelUsed: model,
             latencyMs,
           });
@@ -115,8 +143,8 @@ export async function POST(request: NextRequest) {
             conversationId: convId,
             provider,
             model: model || "default",
-            tokensInput: message.split(/\s+/).length,
-            tokensOutput: fullResponse.split(/\s+/).length,
+            tokensInput: inputTokens,
+            tokensOutput: outputTokens,
             latencyMs,
           });
 

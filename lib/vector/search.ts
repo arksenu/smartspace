@@ -21,38 +21,34 @@ export async function vectorSearch(
   const [queryEmbedding] = await generateEmbeddings([query]);
 
   // Build the query
-  let queryBuilder = supabase
-    .rpc("match_document_chunks", {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.5,
-      match_count: topK,
-      user_id: userId,
-    });
-
-  if (documentId) {
-    queryBuilder = queryBuilder.eq("document_id", documentId);
-  }
-
-  const { data, error } = await queryBuilder;
+  const { data, error } = await supabase.rpc("match_document_chunks", {
+    query_embedding: queryEmbedding,
+    match_threshold: 0.5,
+    match_count: topK,
+    user_id: userId,
+    document_id_filter: documentId || null,
+  });
 
   if (error) {
     // Fallback to manual similarity search if RPC function doesn't exist
+    // Fetch all chunks (with embedding filter) and calculate similarity for accurate results
     let chunksQuery = supabase
       .from("document_chunks")
       .select("*")
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .not("embedding", "is", null); // Only fetch chunks with embeddings
 
     if (documentId) {
       chunksQuery = chunksQuery.eq("document_id", documentId);
     }
 
-    const { data: chunks, error: chunksError } = await chunksQuery.limit(topK * 2);
+    const { data: chunks, error: chunksError } = await chunksQuery;
 
     if (chunksError || !chunks) {
       throw new Error(`Vector search failed: ${chunksError?.message || "Unknown error"}`);
     }
 
-    // Calculate cosine similarity manually
+    // Calculate cosine similarity for all chunks and sort
     const results = chunks
       .map((chunk) => {
         if (!chunk.embedding) return null;

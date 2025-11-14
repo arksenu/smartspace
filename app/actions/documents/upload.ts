@@ -5,6 +5,34 @@ import { requireAuth } from "@/lib/auth/require-auth";
 import { revalidatePath } from "next/cache";
 import { ingestUrl as ingestUrlContent } from "@/lib/ingestion/url-ingestion";
 
+/**
+ * Validates file content by checking magic bytes/headers
+ * Prevents malicious files disguised with wrong extensions
+ */
+async function validateFileContent(file: File, expectedExt: string): Promise<void> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const header = buffer.slice(0, 8).toString("utf-8");
+
+  if (expectedExt === "pdf") {
+    // PDF files start with "%PDF-"
+    if (!header.startsWith("%PDF-")) {
+      throw new Error("Invalid PDF file: file content does not match PDF format");
+    }
+  } else if (expectedExt === "txt") {
+    // Text files should be valid UTF-8 and not contain binary data
+    // Check if the file contains null bytes or other binary indicators
+    if (buffer.includes(0x00)) {
+      throw new Error("Invalid text file: file contains binary data");
+    }
+    // Try to decode as UTF-8 to validate
+    try {
+      buffer.toString("utf-8");
+    } catch {
+      throw new Error("Invalid text file: not valid UTF-8 encoding");
+    }
+  }
+}
+
 export async function uploadDocument(formData: FormData) {
   const user = await requireAuth();
   const supabase = await createClient();
@@ -15,7 +43,15 @@ export async function uploadDocument(formData: FormData) {
   }
 
   // Generate unique filename
-  const fileExt = file.name.split(".").pop();
+  const fileExt = file.name.split(".").pop()?.toLowerCase();
+  
+  // Validate file extension
+  if (!fileExt || !["pdf", "txt"].includes(fileExt)) {
+    throw new Error("Unsupported file type. Only PDF and TXT files are allowed.");
+  }
+
+  // Validate file content matches extension
+  await validateFileContent(file, fileExt);
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
   const filePath = `${user.id}/${fileName}`;
 
@@ -38,7 +74,7 @@ export async function uploadDocument(formData: FormData) {
       user_id: user.id,
       title: file.name,
       file_name: file.name,
-      file_type: fileExt === "pdf" ? "pdf" : fileExt === "txt" ? "txt" : "unknown",
+      file_type: fileExt,
       file_size: file.size,
       storage_path: filePath,
       status: "pending",
@@ -56,12 +92,27 @@ export async function uploadDocument(formData: FormData) {
 
   // Trigger ingestion pipeline automatically (non-blocking)
   // Use dynamic import to avoid loading PDF parsing libraries during module initialization
-  import("@/lib/ingestion/pipeline").then(({ processDocument }) => {
-    processDocument(document.id, user.id).catch((error) => {
-      // Don't fail upload if ingestion fails - it can be retried manually
+  import("@/lib/ingestion/pipeline")
+    .then(({ processDocument }) => {
+      return processDocument(document.id, user.id);
+    })
+    .catch(async (error) => {
+      // Handle both dynamic import errors and processing errors
       console.error("Failed to process document:", error);
+      
+      // Update document status to failed if import or processing fails
+      const supabaseClient = await createClient();
+      await supabaseClient
+        .from("documents")
+        .update({
+          status: "failed",
+          metadata: {
+            error: error instanceof Error ? error.message : "Unknown error",
+            failedAt: new Date().toISOString(),
+          },
+        })
+        .eq("id", document.id);
     });
-  });
 
   return document;
 }
@@ -97,11 +148,28 @@ export async function ingestUrl(url: string) {
 
   // Trigger ingestion pipeline automatically for URLs (non-blocking)
   // Use dynamic import to avoid loading PDF parsing libraries during module initialization
-  import("@/lib/ingestion/pipeline").then(({ processDocument }) => {
-    processDocument(document.id, user.id).catch((error) => {
+  import("@/lib/ingestion/pipeline")
+    .then(({ processDocument }) => {
+      return processDocument(document.id, user.id);
+    })
+    .catch(async (error) => {
+      // Handle both dynamic import errors and processing errors
       console.error("Failed to process document:", error);
+      
+      // Update document status to failed if import or processing fails
+      const supabaseClient = await createClient();
+      await supabaseClient
+        .from("documents")
+        .update({
+          status: "failed",
+          metadata: {
+            ...(document.metadata || {}),
+            error: error instanceof Error ? error.message : "Unknown error",
+            failedAt: new Date().toISOString(),
+          },
+        })
+        .eq("id", document.id);
     });
-  });
 
   return document;
 }

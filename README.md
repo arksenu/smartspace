@@ -58,9 +58,49 @@ Fill in your environment variables:
 
 4. Set up Supabase:
    - Create a new Supabase project
-   - Run the SQL migration from `supabase/migrations/001_initial_schema.sql` in the Supabase SQL editor
+   - Run the SQL migrations from `supabase/migrations/` in the Supabase SQL editor
    - Enable PGVector extension
    - Create a storage bucket named `documents` with public access
+   - Set up the RLS policies for the storage bucket:
+
+     1. Navigate to Storage → Click on the `documents` bucket → Go to "Policies" tab
+     2. Click "New Policy" and create the following 4 policies:
+
+     **Policy 1 - Upload:**
+     - Policy name: `Users can upload own documents`
+     - Allowed operation: `INSERT`
+     - Target roles: `authenticated`
+     - Policy definition:
+       ```sql
+       (bucket_id = 'documents'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)
+       ```
+
+     **Policy 2 - Read:**
+     - Policy name: `Users can read own documents`
+     - Allowed operation: `SELECT`
+     - Target roles: `authenticated`
+     - Policy definition:
+       ```sql
+       (bucket_id = 'documents'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)
+       ```
+
+     **Policy 3 - Update:**
+     - Policy name: `Users can update own documents`
+     - Allowed operation: `UPDATE`
+     - Target roles: `authenticated`
+     - Policy definition:
+       ```sql
+       (bucket_id = 'documents'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)
+       ```
+
+     **Policy 4 - Delete:**
+     - Policy name: `Users can delete own documents`
+     - Allowed operation: `DELETE`
+     - Target roles: `authenticated`
+     - Policy definition:
+       ```sql
+       (bucket_id = 'documents'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)
+       ```
 
 5. Run the development server:
 ```bash

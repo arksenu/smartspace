@@ -1,4 +1,4 @@
-const pdfParse = require("pdf-parse-new");
+import pdfParse from "pdf-parse-new";
 
 export interface ParsedPDF {
   text: string;

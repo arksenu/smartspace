@@ -3,7 +3,7 @@ import { SearchResult } from "@/lib/vector/search";
 export interface BuildPromptOptions {
   systemPrompt?: string;
   contextChunks: SearchResult[];
-  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
+  conversationHistory: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   userQuery: string;
   maxContextTokens?: number;
 }
@@ -24,10 +24,8 @@ export function buildPrompt(options: BuildPromptOptions): Array<{ role: "user" |
     .map((chunk, index) => `[Document ${index + 1}]\n${chunk.content}`)
     .join("\n\n");
 
-  // Build the full prompt
-  const fullPrompt = `${systemPrompt}
-
-Context from documents:
+  // Build the full prompt (system prompt is already in system message, don't duplicate)
+  const fullPrompt = `Context from documents:
 ${contextText}
 
 Based on the context above, please answer the following question. If the context doesn't contain enough information, please say so.

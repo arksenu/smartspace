@@ -56,6 +56,8 @@ export function ChatInterface({ conversationId, initialMessages = [] }: ChatInte
     };
     setMessages((prev) => [...prev, userMessage]);
     setStreaming(true);
+    // Clear sources for new query
+    setSources([]);
 
     try {
       const response = await fetch("/api/chat", {
@@ -101,13 +103,23 @@ export function ChatInterface({ conversationId, initialMessages = [] }: ChatInte
 
             try {
               const parsed = JSON.parse(data);
-              assistantMessage.content += parsed.content;
+              
+              // Handle sources
+              if (parsed.type === "sources" && parsed.sources) {
+                setSources(parsed.sources);
+                continue;
+              }
+              
+              // Handle content chunks
+              if (parsed.content) {
+                assistantMessage.content += parsed.content;
 
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { ...assistantMessage };
-                return updated;
-              });
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { ...assistantMessage };
+                  return updated;
+                });
+              }
             } catch (e) {
               // Ignore parse errors
             }
