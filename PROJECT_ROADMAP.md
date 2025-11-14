@@ -89,7 +89,7 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
   );
   ```
 - [x] Set up Row Level Security (RLS) policies
-- [ ] Create trigger for automatic profile creation on signup
+- [x] Create trigger for automatic profile creation on signup
 
 #### 2.3.2 Documents Table
 - [x] Create `documents` table
@@ -109,7 +109,8 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
   );
   ```
 - [x] Add RLS policies (users can only access their own documents)
-- [x] Create indexes on `user_id`, `status`, `created_at`
+- [x] Create indexes on `user_id`, `status`
+- [ ] Create index on `created_at` (not yet implemented)
 
 #### 2.3.3 Document Chunks Table (with Vector)
 - [x] Create `document_chunks` table
@@ -132,7 +133,8 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
   CREATE INDEX ON document_chunks USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
   ```
-- [x] Create indexes on `document_id`, `user_id`, `chunk_index`
+- [x] Create indexes on `document_id`, `user_id`
+- [ ] Create index on `chunk_index` (not yet implemented)
 
 #### 2.3.4 Conversations Table
 - [x] Create `conversations` table
@@ -193,7 +195,8 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
   );
   ```
 - [x] Add RLS policies
-- [x] Create indexes on `user_id`, `created_at`, `provider`
+- [x] Create indexes on `user_id`, `created_at`
+- [ ] Create index on `provider` (not yet implemented)
 
 ### 2.4 Supabase Storage Setup
 - [x] Create storage bucket: `documents`
@@ -202,10 +205,10 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
 - [x] Configure file size limits and allowed types
 
 ### 2.5 Database Functions & Triggers
-- [ ] Create function to update `updated_at` timestamp
-- [ ] Create trigger for `documents.updated_at`
-- [ ] Create trigger for `conversations.updated_at`
-- [ ] Create function to count chunks per document
+- [x] Create function to update `updated_at` timestamp
+- [x] Create trigger for `documents.updated_at`
+- [x] Create trigger for `conversations.updated_at`
+- [ ] Create function to count chunks per document (chunk_count column exists but no function)
 - [ ] Create function to get conversation token usage
 
 ### 2.6 Drizzle ORM Setup (Optional but Recommended)
@@ -220,17 +223,17 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
 ## Phase 3: Authentication Implementation
 
 ### 3.1 Supabase Auth Configuration
-- [ ] Configure Supabase Auth settings
+- [x] Configure Supabase Auth settings (email/password enabled)
   - Enable email/password
-  - Enable magic link
+  - Enable magic link (UI implemented, see auth-form.tsx)
   - Configure OAuth providers (Google, GitHub) if needed
   - Set up email templates
-- [ ] Configure redirect URLs for auth callbacks
+- [x] Configure redirect URLs for auth callbacks (implemented in auth-form.tsx)
 
 ### 3.2 Auth UI Components
 - [x] Create `/app/(auth)/login/page.tsx`
   - Email/password form
-  - Magic link option
+  - Magic link option (implemented in auth-form.tsx)
   - OAuth buttons (if enabled)
   - Error handling
 - [x] Create `/app/(auth)/signup/page.tsx`
@@ -282,12 +285,12 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
 - [x] Add error handling and validation
 
 ### 4.3 URL Ingestion
-- [ ] Create `/components/documents/url-input.tsx`
+- [x] Create URL input component (integrated into `/components/documents/upload-document-button.tsx`)
   - URL input form
   - URL validation
-- [x] Create `/app/actions/documents/ingest-url.ts`
+- [x] Create `/app/actions/documents/ingest-url.ts` (implemented as `ingestUrl` function in `upload.ts`)
   - Fetch URL content
-  - Extract text (using cheerio or similar)
+  - Extract text (using cheerio - see `lib/ingestion/url-ingestion.ts`)
   - Create document record
   - Trigger ingestion pipeline
 
@@ -326,11 +329,11 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
   - Error handling for corrupted PDFs
 
 ### 5.2 Text Processing
-- [ ] Create `/lib/ingestion/text-processor.ts`
-  - Normalize whitespace
+- [ ] Create `/lib/ingestion/text-processor.ts` (text processing is integrated into chunker.ts and pipeline.ts)
+  - Normalize whitespace (handled in pipeline)
   - Remove special characters (optional)
-  - Split into paragraphs
-  - Calculate token counts
+  - Split into paragraphs (handled in chunker)
+  - Calculate token counts (handled in chunker with tiktoken)
 
 ### 5.3 Chunking Strategy
 - [x] Create `/lib/ingestion/chunker.ts`
@@ -447,17 +450,17 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
   - Keyboard shortcuts (Enter to send, Shift+Enter for new line)
   - Character/token counter (optional)
   - Disable during streaming
-- [ ] Create `/components/chat/input-toolbar.tsx`
+- [ ] Create `/components/chat/input-toolbar.tsx` (settings are loaded from user settings, not in toolbar)
   - Model selector
   - Temperature slider
   - Settings button
 
 ### 7.5 Streaming Response Handler
-- [ ] Create `/lib/chat/stream-handler.ts`
+- [x] Streaming implemented directly in `/components/chat/chat-interface.tsx` (no separate stream-handler.ts)
   - Handle Server-Sent Events (SSE)
   - Parse streaming chunks
   - Update UI incrementally
-- [ ] Create `/hooks/use-chat-stream.ts`
+- [x] Streaming logic implemented in chat-interface.tsx (no separate use-chat-stream hook)
   - React hook for streaming
   - State management
   - Error handling
@@ -570,7 +573,7 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
 
 ### 9.3 Search Integration
 - [x] Connect search UI to search API
-- [ ] Add debouncing for search input
+- [ ] Add debouncing for search input (not yet implemented)
 - [x] Add loading states
 - [x] Add empty states
 
@@ -621,13 +624,13 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
 ### 11.1 Settings Page
 - [x] Create `/app/(dashboard)/settings/page.tsx`
   - Tabs for different settings sections
-  - Model selection
-  - Temperature control
-  - System prompt editor
+  - Model selection (implemented with Select component)
+  - Temperature control (implemented with Slider component)
+  - System prompt editor (implemented with Textarea component)
   - Memory toggle
-- [ ] Create `/components/settings/model-selector.tsx`
-- [ ] Create `/components/settings/temperature-slider.tsx`
-- [ ] Create `/components/settings/system-prompt-editor.tsx`
+- [x] Model selector (integrated into settings page with Select component)
+- [x] Temperature slider (integrated into settings page with Slider component)
+- [x] System prompt editor (integrated into settings page with Textarea component)
 
 ### 11.2 Settings Persistence
 - [x] Create `/app/actions/settings/update.ts`
@@ -648,10 +651,10 @@ This roadmap provides a comprehensive, step-by-step plan for building a producti
 ### 12.1 Main Dashboard
 - [x] Create `/app/(dashboard)/page.tsx`
   - Welcome message
-  - Quick stats (document count, total chunks, conversations)
-  - Recent documents
-  - Recent conversations
-  - Quick actions
+  - Quick stats (document count, total chunks, conversations) - basic welcome page only
+  - Recent documents (not yet implemented)
+  - Recent conversations (not yet implemented)
+  - Quick actions (not yet implemented)
 - [ ] Create `/components/dashboard/stats-grid.tsx`
 - [ ] Create `/components/dashboard/recent-activity.tsx`
 
