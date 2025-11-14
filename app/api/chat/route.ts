@@ -3,9 +3,9 @@ import { requireAuth } from "@/lib/auth/require-auth";
 import { createClient } from "@/lib/supabase/server";
 import { vectorSearch } from "@/lib/vector/search";
 import { buildPrompt } from "@/lib/rag/prompt-builder";
-import { getConversationHistory } from "@/lib/chat/memory";
+import { getConversationHistory, updateConversationSummary } from "@/lib/chat/memory";
 import { saveMessage } from "@/lib/chat/save-message";
-import { streamChatCompletion } from "@/lib/llm";
+import { streamChatCompletion, LLMProvider } from "@/lib/llm";
 import { logEval } from "@/lib/analytics/logger";
 import { getSettings } from "@/app/actions/settings/update";
 import { get_encoding, TiktokenEncoding } from "tiktoken";
@@ -40,45 +40,71 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Get or create conversation
-    let convId = conversationId;
-    if (!convId) {
-      const { data: newConv, error: convError } = await supabase
-        .from("conversations")
-        .insert({
-          user_id: user.id,
-          title: message.substring(0, 50),
-          model_provider: provider,
-          model_name: model,
-          temperature: temperature,
-          system_prompt: defaultSystemPrompt,
-        })
-        .select()
-        .single();
+      // Get or create conversation
+      let convId: string;
+      let conversationMeta: { use_memory?: boolean | null; system_prompt?: string | null } | null = null;
 
-      if (convError) {
-        throw new Error(`Failed to create conversation: ${convError.message}`);
+      if (!conversationId) {
+        const { data: newConv, error: convError } = await supabase
+          .from("conversations")
+          .insert({
+            user_id: user.id,
+            title: message.substring(0, 50),
+            model_provider: provider,
+            model_name: model,
+            temperature: temperature,
+            system_prompt: defaultSystemPrompt,
+          })
+          .select()
+          .single();
+
+        if (convError) {
+          throw new Error(`Failed to create conversation: ${convError.message}`);
+        }
+
+        convId = newConv.id;
+        conversationMeta = newConv;
+      } else {
+        convId = conversationId;
+        const { data: existingConv, error: fetchConvError } = await supabase
+          .from("conversations")
+          .select("use_memory, system_prompt")
+          .eq("id", convId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (fetchConvError) {
+          throw new Error(`Failed to load conversation settings: ${fetchConvError.message}`);
+        }
+
+        if (!existingConv) {
+          throw new Error("Conversation not found for the current user.");
+        }
+
+        conversationMeta = existingConv;
       }
 
-      convId = newConv.id;
-    }
+      const useMemory = conversationMeta?.use_memory ?? true;
+      const activeSystemPrompt = conversationMeta?.system_prompt ?? defaultSystemPrompt;
 
-    // Retrieve relevant chunks
-    const searchResults = await vectorSearch(message, user.id, 5);
+      // Retrieve relevant chunks
+      const searchResults = await vectorSearch(message, user.id, 5);
 
-    // Get conversation history
-    const history = await getConversationHistory(convId, user.id, 10);
+      // Get conversation history
+      const historyContext = await getConversationHistory({
+        conversationId: convId,
+        userId: user.id,
+        useMemory,
+        model,
+      });
 
-    // Build prompt with user's system prompt if available
-    const messages = buildPrompt({
-      systemPrompt: defaultSystemPrompt,
-      contextChunks: searchResults,
-      conversationHistory: history.map((h) => ({
-        role: h.role,
-        content: h.content,
-      })),
-      userQuery: message,
-    });
+      // Build prompt with user's system prompt if available
+      const messages = buildPrompt({
+        systemPrompt: activeSystemPrompt,
+        contextChunks: searchResults,
+        conversationHistory: historyContext.messages,
+        userQuery: message,
+      });
 
     // Save user message
     await saveMessage({
@@ -95,8 +121,23 @@ export async function POST(request: NextRequest) {
         let fullResponse = "";
         const encoder = new TextEncoder();
 
-        try {
-          // Send sources first
+          try {
+            // Emit memory metadata if we have it
+            if (historyContext.summaryIncluded || historyContext.truncatedMessages > 0) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "memory",
+                    summaryIncluded: historyContext.summaryIncluded,
+                    truncatedMessages: historyContext.truncatedMessages,
+                    tokensUsed: historyContext.tokensUsed,
+                    summary: historyContext.summaryText ?? undefined,
+                  })}\n\n`
+                )
+              );
+            }
+
+            // Send sources first
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -110,11 +151,11 @@ export async function POST(request: NextRequest) {
             )
           );
 
-          for await (const chunk of streamChatCompletion(
-            provider as "openai" | "anthropic" | "groq",
-            messages,
-            { model, temperature }
-          )) {
+            for await (const chunk of streamChatCompletion(
+              provider as LLMProvider,
+              messages,
+              { model, temperature }
+            )) {
             fullResponse += chunk.content;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
           }
@@ -147,6 +188,17 @@ export async function POST(request: NextRequest) {
             tokensOutput: outputTokens,
             latencyMs,
           });
+
+            if (useMemory) {
+              updateConversationSummary({
+                conversationId: convId,
+                userId: user.id,
+                provider: provider as LLMProvider,
+                model,
+              }).catch((err) => {
+                console.error("Failed to update conversation summary", err);
+              });
+            }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
