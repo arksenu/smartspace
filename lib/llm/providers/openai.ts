@@ -61,7 +61,7 @@ export async function* streamChatCompletion(
 
   console.log(`[OpenAI Provider] Attempting to use Responses API`);
   console.log(`[OpenAI Provider] Model: ${modelToUse}`);
-  console.log(`[OpenAI Provider] Temperature: ${options.temperature ?? 0.7}`);
+  console.log(`[OpenAI Provider] Temperature: ${options.temperature ?? 1.0}`);
   console.log(`[OpenAI Provider] Max Tokens: ${options.maxTokens ?? 'default'}`);
 
   try {
@@ -100,7 +100,18 @@ export async function* streamChatCompletion(
       }
       // Handle response failed/incomplete events
       else if (chunk.type === 'response.failed' || chunk.type === 'response.incomplete') {
-        done = true;
+        const errorMessage = (chunk as any).error?.message ||
+          (chunk.type === 'response.failed' ? 'Response generation failed' : 'Response generation incomplete');
+        const errorCode = (chunk as any).error?.code;
+
+        console.error(`[OpenAI Provider] ❌ Response ${chunk.type}: `, {
+          message: errorMessage,
+          code: errorCode,
+          event: chunk,
+        });
+
+        // Throw an error to properly propagate the failure
+        throw new Error(`OpenAI Responses API ${chunk.type}: ${errorMessage}${errorCode ? ` (code: ${errorCode})` : ''}`);
       }
 
       // Only yield if we have content or if we're done
@@ -112,8 +123,12 @@ export async function* streamChatCompletion(
       }
     }
   } catch (error) {
-    // If Responses API is not available, fall back to Chat Completions API
-    if (error instanceof Error && (error.message.includes("responses") || error.message.includes("not found"))) {
+    // If Responses API is not available, fall ba1ck to Chat Completions API
+    // Don't fallback for response.failed/incomplete - those should propagate
+    if (error instanceof Error &&
+      !error.message.includes('response.failed') &&
+      !error.message.includes('response.incomplete') &&
+      (error.message.includes("responses") || error.message.includes("not found"))) {
       console.log(`[OpenAI Provider] ⚠️ Responses API not available: ${error.message}`);
       console.log(`[OpenAI Provider] Falling back to Chat Completions API`);
       console.log(`[OpenAI Provider] Model: ${modelToUse}`);
@@ -122,7 +137,7 @@ export async function* streamChatCompletion(
       const stream = await openai.chat.completions.create({
         model: modelToUse,
         messages: messages as any,
-        temperature: options.temperature ?? 0.7,
+        temperature: options.temperature ?? 1.0,
         max_tokens: options.maxTokens,
         stream: true,
       });

@@ -11,20 +11,24 @@ interface StoredMessage {
 }
 
 const MODEL_TOKEN_LIMITS: Record<string, number> = {
-  "gpt-4-turbo-preview": 128000,
+  "gpt-5.1": 400000,
+  "gpt-5": 400000,
   "gpt-4o": 128000,
   "gpt-4o-mini": 128000,
   "gpt-4.1": 128000,
   "gpt-4.1-mini": 128000,
   "gpt-4.1-nano": 65536,
   "gpt-3.5-turbo": 16385,
-  "claude-3-opus-20240229": 200000,
-  "claude-3.5-sonnet-20240620": 200000,
-  "claude-3-sonnet-20240229": 200000,
-  "claude-3-haiku-20240307": 200000,
-  "mixtral-8x7b": 32000,
-  "mixtral-8x7b-32768": 32768,
-  "llama3-70b-8192": 8192,
+  "claude-opus-4.1": 1000000,
+  "claude-opus-4.1-20250514": 1000000,
+  "claude-opus-4": 1000000,
+  "claude-opus-4-20250514": 1000000,
+  "claude-sonnet-4.5": 1000000,
+  "claude-sonnet-4.5-20250514": 1000000,
+  "claude-sonnet-4": 1000000,
+  "claude-sonnet-4-20250514": 1000000,
+  "openai/gpt-oss-120b": 40960,
+  "llama-3.3-70b-versatile": 32768,
 };
 
 const SUMMARY_MODEL_FALLBACK: Partial<Record<LLMProvider, string>> = {
