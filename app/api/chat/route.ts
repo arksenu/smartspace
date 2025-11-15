@@ -55,6 +55,13 @@ export async function POST(request: NextRequest) {
 
     const { conversationId, message, provider = defaultProvider, model = defaultModel, temperature = defaultTemperature } = await request.json();
 
+    // Log the incoming request configuration
+    console.log(`[Chat Route] New chat request`);
+    console.log(`[Chat Route] Provider: ${provider}`);
+    console.log(`[Chat Route] Model: ${model}`);
+    console.log(`[Chat Route] Temperature: ${temperature}`);
+    console.log(`[Chat Route] Conversation ID: ${conversationId || 'New conversation'}`);
+
     if (!message) {
       return new Response(JSON.stringify({ error: "Message is required" }), {
         status: 400,
@@ -184,6 +191,13 @@ export async function POST(request: NextRequest) {
               })}\n\n`
             )
           );
+
+          // Log the LLM request details
+          console.log(`[Chat Route] Calling LLM with:`);
+          console.log(`[Chat Route] - Provider: ${provider}`);
+          console.log(`[Chat Route] - Model: ${model}`);
+          console.log(`[Chat Route] - Temperature: ${temperature}`);
+          console.log(`[Chat Route] - Message count: ${messages.length}`);
 
           for await (const chunk of streamChatCompletion(
             provider as LLMProvider,
