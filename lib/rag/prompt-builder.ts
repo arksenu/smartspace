@@ -28,7 +28,8 @@ export function buildPrompt(options: BuildPromptOptions): Array<{ role: "user" |
   const fullPrompt = `Context from documents:
 ${contextText}
 
-Based on the context above, please answer the following question. If the context doesn't contain enough information, please say so.
+Based on the context above, please answer the following question. If the context doesn't contain enough information, please say so. If the user asked a question
+which doesn't appear to be asking about the context, just answer the question.
 
 Question: ${userQuery}`;
 

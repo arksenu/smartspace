@@ -23,7 +23,7 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
   const [sources, setSources] = useState<Array<{ chunkId: string; content: string; similarity: number }>>([]);
   const [streaming, setStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>(initialConversationId);
-  const [userSettings, setUserSettings] = useState<{ provider?: string; model?: string; temperature?: number } | null>(null);
+  const [userSettings, setUserSettings] = useState<{ provider?: string; model?: string; temperature?: number; webSearchEnabled?: boolean } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {

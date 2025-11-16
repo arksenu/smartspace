@@ -13,12 +13,9 @@ interface StoredMessage {
 const MODEL_TOKEN_LIMITS: Record<string, number> = {
   "gpt-5.1": 400000,
   "gpt-5": 400000,
-  "gpt-4o": 128000,
-  "gpt-4o-mini": 128000,
   "gpt-4.1": 128000,
   "gpt-4.1-mini": 128000,
   "gpt-4.1-nano": 65536,
-  "gpt-3.5-turbo": 16385,
   "claude-opus-4.1": 1000000,
   "claude-opus-4.1-20250514": 1000000,
   "claude-opus-4": 1000000,

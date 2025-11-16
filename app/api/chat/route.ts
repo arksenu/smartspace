@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     const defaultModel = userSettings?.model || "gpt-4-turbo-preview";
     const defaultTemperature = userSettings?.temperature ?? 0.7;
     const defaultSystemPrompt = userSettings?.systemPrompt;
+    const defaultWebSearchEnabled = userSettings?.webSearchEnabled ?? false;
 
     const { conversationId, message, provider = defaultProvider, model = defaultModel, temperature = defaultTemperature } = await request.json();
 
@@ -199,10 +200,13 @@ export async function POST(request: NextRequest) {
           console.log(`[Chat Route] - Temperature: ${temperature}`);
           console.log(`[Chat Route] - Message count: ${messages.length}`);
 
+          // Use web search setting from user settings if OpenAI provider
+          const webSearchEnabled = provider === "openai" ? defaultWebSearchEnabled : false;
+
           for await (const chunk of streamChatCompletion(
             provider as LLMProvider,
             messages,
-            { model, temperature }
+            { model, temperature, webSearchEnabled }
           )) {
             fullResponse += chunk.content;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));

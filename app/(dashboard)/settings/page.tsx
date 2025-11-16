@@ -8,15 +8,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { saveSettings, getSettings } from "@/app/actions/settings/update";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const DEFAULT_SETTINGS = {
   provider: "openai",
-  model: "gpt-4-turbo-preview",
-  temperature: 0.7,
+  model: "gpt-5.1",
+  temperature: 1.0,
   systemPrompt: "",
+  webSearchEnabled: false,
 };
 
 export default function SettingsPage() {
@@ -24,6 +26,7 @@ export default function SettingsPage() {
   const [model, setModel] = useState(DEFAULT_SETTINGS.model);
   const [temperature, setTemperature] = useState([DEFAULT_SETTINGS.temperature]);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SETTINGS.systemPrompt);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(DEFAULT_SETTINGS.webSearchEnabled);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -39,6 +42,7 @@ export default function SettingsPage() {
         setModel(settings.model || DEFAULT_SETTINGS.model);
         setTemperature([settings.temperature ?? DEFAULT_SETTINGS.temperature]);
         setSystemPrompt(settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt);
+        setWebSearchEnabled(settings.webSearchEnabled ?? DEFAULT_SETTINGS.webSearchEnabled);
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
@@ -55,6 +59,7 @@ export default function SettingsPage() {
         model,
         temperature: temperature[0],
         systemPrompt,
+        webSearchEnabled,
       });
       toast.success("Settings saved successfully");
     } catch (error: any) {
@@ -134,6 +139,24 @@ export default function SettingsPage() {
               step={0.1}
             />
           </div>
+
+          {provider === "openai" && (
+            <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="web-search" className="text-base">
+                  Web Search
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable OpenAI's built-in web search tool for real-time information
+                </p>
+              </div>
+              <Switch
+                id="web-search"
+                checked={webSearchEnabled}
+                onCheckedChange={setWebSearchEnabled}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
