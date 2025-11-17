@@ -63,7 +63,9 @@ Output only the number (0, 1, 2, 3, or 4):`;
           },
         ],
         temperature: 0.1, // Low temperature for consistent scoring
-        max_tokens: 200, // Increased significantly for reasoning models (they need reasoning + answer tokens)
+        // For reasoning models, need more tokens. Use 500 to allow full reasoning + answer
+        // For regular models, this is more than enough
+        max_tokens: modelName === "openai/gpt-oss-120b" ? 500 : 50,
       });
 
       // Log full response for debugging
@@ -77,10 +79,11 @@ Output only the number (0, 1, 2, 3, or 4):`;
       
       // For reasoning models (like openai/gpt-oss-120b), the answer might be in the reasoning field
       // Check reasoning field if content is empty
-      if (!content && (choice?.message as any)?.reasoning) {
-        const reasoning = (choice?.message as any).reasoning.trim();
-        console.log(`[Interceptor] Model ${modelName} returned reasoning instead of content. Reasoning: ${reasoning.substring(0, 200)}...`);
-        // Try to extract score from reasoning
+      const message = choice?.message as any;
+      if (!content && message?.reasoning) {
+        const reasoning = message.reasoning.trim();
+        console.log(`[Interceptor] Model ${modelName} returned reasoning instead of content. Reasoning length: ${reasoning.length}, preview: ${reasoning.substring(0, 200)}...`);
+        // Try to extract score from reasoning - use reasoning as content source
         content = reasoning;
       }
       
@@ -101,6 +104,7 @@ Output only the number (0, 1, 2, 3, or 4):`;
       }
       
       // Extract integer from response (handle cases where LLM adds extra text)
+      // For reasoning models, look for patterns like "relevance is 3" or "score: 4" or just the last number
       // Look for the last number in the response (most likely to be the final answer)
       const numbers = content.match(/\d+/g);
       if (!numbers || numbers.length === 0) {
@@ -108,8 +112,31 @@ Output only the number (0, 1, 2, 3, or 4):`;
         return null;
       }
       
-      // Use the last number found (most likely the final answer after reasoning)
-      const match = numbers[numbers.length - 1];
+      // For reasoning models, try to find score patterns first
+      let match: string | null = null;
+      if (modelName === "openai/gpt-oss-120b" || message?.reasoning) {
+        // Look for patterns like "relevance is 3", "score: 4", "rating: 2", etc.
+        const scorePatterns = [
+          /relevance\s+(?:is|:|=)\s*(\d)/i,
+          /score\s*(?:is|:|=)\s*(\d)/i,
+          /rating\s*(?:is|:|=)\s*(\d)/i,
+          /answer\s*(?:is|:|=)\s*(\d)/i,
+        ];
+        
+        for (const pattern of scorePatterns) {
+          const found = content.match(pattern);
+          if (found && found[1]) {
+            match = found[1];
+            console.log(`[Interceptor] Found score pattern match: ${match} from pattern ${pattern}`);
+            break;
+          }
+        }
+      }
+      
+      // If no pattern match, use the last number found (most likely the final answer after reasoning)
+      if (!match) {
+        match = numbers[numbers.length - 1];
+      }
 
       const score = parseInt(match, 10);
       
