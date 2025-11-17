@@ -10,6 +10,7 @@ export interface UserSettings {
   temperature: number;
   systemPrompt?: string;
   webSearchEnabled?: boolean;
+  llmVerifiedRetrieval?: boolean;
 }
 
 export async function saveSettings(settings: UserSettings) {

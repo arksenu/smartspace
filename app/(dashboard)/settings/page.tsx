@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [temperature, setTemperature] = useState([DEFAULT_SETTINGS.temperature]);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SETTINGS.systemPrompt);
   const [webSearchEnabled, setWebSearchEnabled] = useState(DEFAULT_SETTINGS.webSearchEnabled);
+  const [llmVerifiedRetrieval, setLlmVerifiedRetrieval] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -64,6 +65,7 @@ export default function SettingsPage() {
             ? settings.webSearchEnabled ?? DEFAULT_SETTINGS.webSearchEnabled
             : false
         );
+        setLlmVerifiedRetrieval(settings.llmVerifiedRetrieval ?? false);
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
@@ -81,11 +83,13 @@ export default function SettingsPage() {
         temperature: number;
         systemPrompt?: string;
         webSearchEnabled?: boolean;
+        llmVerifiedRetrieval?: boolean;
       } = {
         provider,
         model,
         temperature: temperature[0],
         systemPrompt,
+        llmVerifiedRetrieval,
       };
 
       // Only include webSearchEnabled when provider is OpenAI
@@ -190,6 +194,22 @@ export default function SettingsPage() {
               />
             </div>
           )}
+
+          <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="llm-verified-retrieval" className="text-base">
+                LLM-Verified Retrieval Filtering
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Use advanced LLM-based filtering to improve retrieval quality. When ON, uses Groq to verify chunk relevance before retrieval.
+              </p>
+            </div>
+            <Switch
+              id="llm-verified-retrieval"
+              checked={llmVerifiedRetrieval}
+              onCheckedChange={setLlmVerifiedRetrieval}
+            />
+          </div>
         </CardContent>
       </Card>
 
