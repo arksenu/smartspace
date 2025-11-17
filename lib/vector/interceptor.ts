@@ -42,8 +42,14 @@ document_chunk: ${documentChunk}
 
 Relevance score (0-4):`;
 
+  // Helper to sleep/delay
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   // Try primary model first, fallback to alternative if it fails
-  const tryModel = async (modelName: string): Promise<number | null> => {
+  const tryModel = async (modelName: string, retryCount = 0): Promise<number | null> => {
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second base delay
+
     try {
       const response = await groq.chat.completions.create({
         model: modelName,
@@ -90,7 +96,30 @@ Relevance score (0-4):`;
       if (score > 4) return 4;
       
       return score;
-    } catch (error) {
+    } catch (error: any) {
+      // Handle rate limiting with retry
+      if (error?.status === 429 && retryCount < maxRetries) {
+        // Extract retry-after from headers (could be string or number)
+        let retryAfterMs = baseDelay * Math.pow(2, retryCount); // Default exponential backoff
+        
+        if (error?.headers) {
+          const retryAfterHeader = error.headers['retry-after'] || error.headers['Retry-After'];
+          if (retryAfterHeader) {
+            // Parse retry-after (could be seconds as string or number)
+            const retryAfterSeconds = typeof retryAfterHeader === 'string' 
+              ? parseFloat(retryAfterHeader) 
+              : retryAfterHeader;
+            retryAfterMs = Math.ceil(retryAfterSeconds * 1000);
+            // Add a small buffer (10%) to be safe
+            retryAfterMs = Math.ceil(retryAfterMs * 1.1);
+          }
+        }
+        
+        console.warn(`[Interceptor] Rate limited for model ${modelName}, retrying after ${retryAfterMs}ms (attempt ${retryCount + 1}/${maxRetries})`);
+        await sleep(retryAfterMs);
+        return tryModel(modelName, retryCount + 1);
+      }
+
       console.error(`[Interceptor] Error scoring relevance with Groq model ${modelName}:`, error);
       if (error instanceof Error) {
         console.error(`[Interceptor] Error message:`, error.message);
@@ -122,7 +151,8 @@ Relevance score (0-4):`;
 }
 
 /**
- * Score relevance for multiple chunks in parallel
+ * Score relevance for multiple chunks with rate limiting
+ * Processes chunks in batches to avoid hitting rate limits
  * @param userQuery The user's query
  * @param chunks Array of chunks with their IDs and content
  * @returns Array of relevance scores
@@ -131,13 +161,34 @@ export async function scoreRelevanceBatch(
   userQuery: string,
   chunks: Array<{ chunkId: string; content: string }>
 ): Promise<RelevanceScore[]> {
-  // Score all chunks in parallel for efficiency
-  const promises = chunks.map((chunk) =>
-    scoreRelevance(userQuery, chunk.content).then((score) => ({
-      chunkId: chunk.chunkId,
-      score,
-    }))
-  );
+  if (chunks.length === 0) return [];
 
-  return Promise.all(promises);
+  // Process in smaller batches to avoid rate limits
+  // Groq free tier: 8000 TPM, so we'll batch conservatively
+  const BATCH_SIZE = 3; // Process 3 at a time
+  const BATCH_DELAY = 500; // 500ms delay between batches
+  
+  const results: RelevanceScore[] = [];
+
+  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+    const batch = chunks.slice(i, i + BATCH_SIZE);
+    
+    // Process batch in parallel
+    const batchPromises = batch.map((chunk) =>
+      scoreRelevance(userQuery, chunk.content).then((score) => ({
+        chunkId: chunk.chunkId,
+        score,
+      }))
+    );
+
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+
+    // Add delay between batches (except for the last batch)
+    if (i + BATCH_SIZE < chunks.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+    }
+  }
+
+  return results;
 }
