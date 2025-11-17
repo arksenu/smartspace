@@ -4,8 +4,10 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-const INTERCEPTOR_MODEL = "openai/gpt-oss-120b";
-const FALLBACK_MODEL = "llama-3.1-70b-versatile"; // Fallback if primary model fails
+// User requested openai/gpt-oss-120b, but if it returns empty responses,
+// we'll fallback to llama-3.1-70b-versatile which is known to work
+const INTERCEPTOR_MODEL = "openai/gpt-oss-120b"; // User-requested model
+const FALLBACK_MODEL = "llama-3.1-70b-versatile"; // Fallback: known working model
 
 export interface RelevanceScore {
   chunkId: string;
@@ -72,20 +74,25 @@ Relevance score (0-4):`;
       const choice = response.choices[0];
       const content = choice?.message?.content?.trim() || "";
       
+      // Log full response for debugging (always log to see what we're getting)
+      console.log(`[Interceptor] Groq response for model ${modelName}:`, JSON.stringify({
+        finish_reason: choice?.finish_reason,
+        content: content || "(empty)",
+        message_role: choice?.message?.role,
+        response_id: (response as any).id,
+        usage: (response as any).usage,
+      }, null, 2));
+      
       // Log if content is empty
       if (!content) {
-        console.error(`[Interceptor] Groq returned empty content for model ${modelName}. Full response:`, JSON.stringify({
-          finish_reason: choice?.finish_reason,
-          message: choice?.message,
-          response_id: (response as any).id,
-        }, null, 2));
+        console.error(`[Interceptor] Groq returned empty content for model ${modelName}. Full response object:`, JSON.stringify(response, null, 2));
         return null;
       }
       
       // Extract integer from response (handle cases where LLM adds extra text)
       const match = content.match(/\d+/);
       if (!match) {
-        console.warn(`[Interceptor] Failed to parse relevance score from: "${content}" for model ${modelName}. Full response:`, JSON.stringify(choice?.message, null, 2));
+        console.warn(`[Interceptor] Failed to parse relevance score from: "${content}" for model ${modelName}. Full choice:`, JSON.stringify(choice, null, 2));
         return null;
       }
 
@@ -132,12 +139,13 @@ Relevance score (0-4):`;
     }
   };
 
-  // Try primary model first
+  // Try primary model first, but log that we're trying it
+  console.log(`[Interceptor] Attempting to score relevance with model: ${INTERCEPTOR_MODEL}`);
   let score = await tryModel(INTERCEPTOR_MODEL);
   
-  // If primary model fails, try fallback
+  // If primary model fails, try fallback immediately
   if (score === null) {
-    console.log(`[Interceptor] Primary model ${INTERCEPTOR_MODEL} failed, trying fallback ${FALLBACK_MODEL}`);
+    console.log(`[Interceptor] Primary model ${INTERCEPTOR_MODEL} returned null, trying fallback ${FALLBACK_MODEL}`);
     score = await tryModel(FALLBACK_MODEL);
   }
   
