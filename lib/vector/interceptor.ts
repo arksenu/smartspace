@@ -68,9 +68,8 @@ Output only the number (0, 1, 2, 3, or 4):`;
         max_tokens: modelName === "openai/gpt-oss-120b" ? 500 : 50,
       });
 
-      // Log full response for debugging
       if (!response.choices || response.choices.length === 0) {
-        console.error(`[Interceptor] Groq response has no choices for model ${modelName}:`, JSON.stringify(response, null, 2));
+        console.error(`[Interceptor] Groq response has no choices for model ${modelName}`);
         return null;
       }
 
@@ -82,33 +81,21 @@ Output only the number (0, 1, 2, 3, or 4):`;
       const message = choice?.message as any;
       if (!content && message?.reasoning) {
         const reasoning = message.reasoning.trim();
-        console.log(`[Interceptor] Model ${modelName} returned reasoning instead of content. Reasoning length: ${reasoning.length}, preview: ${reasoning.substring(0, 200)}...`);
         // Try to extract score from reasoning - use reasoning as content source
         content = reasoning;
       }
       
-      // Log full response for debugging (always log to see what we're getting)
-      console.log(`[Interceptor] Groq response for model ${modelName}:`, JSON.stringify({
-        finish_reason: choice?.finish_reason,
-        content: content || "(empty)",
-        has_reasoning: !!(choice?.message as any)?.reasoning,
-        message_role: choice?.message?.role,
-        response_id: (response as any).id,
-        usage: (response as any).usage,
-      }, null, 2));
-      
-      // Log if content is still empty
+      // Log if content is still empty (error case)
       if (!content) {
-        console.error(`[Interceptor] Groq returned empty content for model ${modelName}. Full response object:`, JSON.stringify(response, null, 2));
+        console.error(`[Interceptor] Groq returned empty content for model ${modelName}. Finish reason: ${choice?.finish_reason}`);
         return null;
       }
       
       // Extract integer from response (handle cases where LLM adds extra text)
       // For reasoning models, look for patterns like "relevance is 3" or "score: 4" or just the last number
-      // Look for the last number in the response (most likely to be the final answer)
       const numbers = content.match(/\d+/g);
       if (!numbers || numbers.length === 0) {
-        console.warn(`[Interceptor] Failed to parse relevance score from: "${content.substring(0, 200)}..." for model ${modelName}. Full choice:`, JSON.stringify(choice, null, 2));
+        console.warn(`[Interceptor] Failed to parse relevance score from response for model ${modelName}`);
         return null;
       }
       
@@ -127,7 +114,6 @@ Output only the number (0, 1, 2, 3, or 4):`;
           const found = content.match(pattern);
           if (found && found[1]) {
             match = found[1];
-            console.log(`[Interceptor] Found score pattern match: ${match} from pattern ${pattern}`);
             break;
           }
         }
@@ -164,36 +150,34 @@ Output only the number (0, 1, 2, 3, or 4):`;
           }
         }
         
-        console.warn(`[Interceptor] Rate limited for model ${modelName}, retrying after ${retryAfterMs}ms (attempt ${retryCount + 1}/${maxRetries})`);
+        // Rate limited - will retry automatically
         await sleep(retryAfterMs);
         return tryModel(modelName, retryCount + 1);
       }
 
-      console.error(`[Interceptor] Error scoring relevance with Groq model ${modelName}:`, error);
+      // Check if it's a model not found/decommissioned error
       if (error instanceof Error) {
-        console.error(`[Interceptor] Error message:`, error.message);
-        // Check if it's a model not found error
-        if (error.message.includes("model") || error.message.includes("not found") || error.message.includes("invalid")) {
-          console.warn(`[Interceptor] Model ${modelName} may not be available, will try fallback`);
+        if (error.message.includes("model") || error.message.includes("not found") || error.message.includes("invalid") || error.message.includes("decommissioned")) {
+          // Model error - will try fallback, no need to log
+          return null;
         }
       }
+      console.error(`[Interceptor] Error scoring relevance with Groq model ${modelName}:`, error instanceof Error ? error.message : error);
       return null;
     }
   };
 
   // Try primary model first (known working model)
-  console.log(`[Interceptor] Attempting to score relevance with model: ${INTERCEPTOR_MODEL}`);
   let score = await tryModel(INTERCEPTOR_MODEL);
   
   // If primary model fails, try fallback (user-requested model)
   if (score === null) {
-    console.log(`[Interceptor] Primary model ${INTERCEPTOR_MODEL} returned null, trying fallback ${FALLBACK_MODEL}`);
     score = await tryModel(FALLBACK_MODEL);
   }
   
   // If both fail, return 0 (no relation) to be conservative
   if (score === null) {
-    console.error("[Interceptor] Both models failed, returning 0");
+    console.warn("[Interceptor] Both models failed to score relevance, returning 0");
     return 0;
   }
   

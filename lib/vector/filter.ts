@@ -68,9 +68,6 @@ export async function runVerifiedRetrieval(
   // Create a map for quick lookup
   const scoreMap = new Map(relevanceScores.map((r) => [r.chunkId, r.score]));
 
-  // Log all scores for debugging
-  console.log(`[Filter] Relevance scores:`, relevanceScores.map(r => `${r.chunkId.substring(0, 8)}:${r.score}`).join(", "));
-
   // Step 7: Keep all chunks scoring >= 2
   let filtered = scoredChunks
     .map((chunk) => ({
@@ -78,8 +75,6 @@ export async function runVerifiedRetrieval(
       relevanceScore: scoreMap.get(chunk.chunkId) ?? 0,
     }))
     .filter((chunk) => chunk.relevanceScore >= 2);
-
-  console.log(`[Filter] After filtering (score >= 2): ${filtered.length} chunks remaining`);
 
   // Step 8: If fewer than k_min remain, keep the top 2 unless all scores are 0
   const maxScore = Math.max(...relevanceScores.map((r) => r.score), 0);
@@ -105,18 +100,8 @@ export async function runVerifiedRetrieval(
     filtered = allScored.slice(0, K_MIN);
   }
 
-  // Step 9: If max score = 0, treat as null-retrieval
-  if (maxScore === 0) {
-    return {
-      results: [],
-      isNullRetrieval: true,
-    };
-  }
-
   // Return results without the extra scoring fields
   const results: SearchResult[] = filtered.map(({ relevanceScore, normalizedScore, mmrScore, ...rest }) => rest);
-
-  console.log(`[Filter] Final results: ${results.length} chunks returned`);
 
   return {
     results,
