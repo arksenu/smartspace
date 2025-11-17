@@ -24,14 +24,18 @@ export function buildPrompt(options: BuildPromptOptions): Array<{ role: "user" |
     .map((chunk, index) => `[Document ${index + 1}]\n${chunk.content}`)
     .join("\n\n");
 
-  // Build the full prompt (system prompt is already in system message, don't duplicate)
-  const fullPrompt = `Context from documents:
+  // Build the full prompt based on whether we have context
+  const fullPrompt = contextChunks.length > 0
+    ? `Context from documents:
 ${contextText}  
 
 Based on the context above, please answer the following question. If the context doesn't contain enough information, please say so. If the user asked a question
 which doesn't appear to be asking about the context, just answer the question.
 
-Question: ${userQuery}`;
+Question: ${userQuery}`
+    : `Question: ${userQuery}
+
+Note: No relevant documents were found in the knowledge base for this question. Please provide a helpful answer based on your general knowledge.`;
 
   // Build messages array
   const messages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [

@@ -34,15 +34,41 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
+  // Reset webSearchEnabled when provider changes away from OpenAI
+  // Restore saved webSearchEnabled when switching back to OpenAI
+  useEffect(() => {
+    // Skip on initial load (handled by loadSettings)
+    if (loading) return;
+
+    if (provider !== "openai") {
+      setWebSearchEnabled(false);
+    } else {
+      // When switching to OpenAI, restore saved webSearchEnabled value
+      getSettings().then((settings) => {
+        if (settings?.provider === "openai") {
+          setWebSearchEnabled(settings.webSearchEnabled ?? DEFAULT_SETTINGS.webSearchEnabled);
+        }
+      }).catch((error) => {
+        console.error("Failed to load webSearchEnabled setting:", error);
+      });
+    }
+  }, [provider, loading]);
+
   const loadSettings = async () => {
     try {
       const settings = await getSettings();
       if (settings) {
-        setProvider(settings.provider || DEFAULT_SETTINGS.provider);
+        const loadedProvider = settings.provider || DEFAULT_SETTINGS.provider;
+        setProvider(loadedProvider);
         setModel(settings.model || DEFAULT_SETTINGS.model);
         setTemperature([settings.temperature ?? DEFAULT_SETTINGS.temperature]);
         setSystemPrompt(settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt);
-        setWebSearchEnabled(settings.webSearchEnabled ?? DEFAULT_SETTINGS.webSearchEnabled);
+        // Only load webSearchEnabled if provider is OpenAI, otherwise default to false
+        setWebSearchEnabled(
+          loadedProvider === "openai"
+            ? settings.webSearchEnabled ?? DEFAULT_SETTINGS.webSearchEnabled
+            : false
+        );
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
@@ -54,13 +80,25 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveSettings({
+      const settingsToSave: {
+        provider: string;
+        model: string;
+        temperature: number;
+        systemPrompt?: string;
+        webSearchEnabled?: boolean;
+      } = {
         provider,
         model,
         temperature: temperature[0],
         systemPrompt,
-        webSearchEnabled,
-      });
+      };
+
+      // Only include webSearchEnabled when provider is OpenAI
+      if (provider === "openai") {
+        settingsToSave.webSearchEnabled = webSearchEnabled;
+      }
+
+      await saveSettings(settingsToSave);
       toast.success("Settings saved successfully");
     } catch (error: any) {
       toast.error(error.message || "Failed to save settings");

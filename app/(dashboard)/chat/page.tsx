@@ -24,8 +24,13 @@ export default function ChatPage() {
     // Only fetch settings if user is authenticated
     if (!user) {
       setLoading(false);
+      setSettings(null);
       return;
     }
+
+    // Reset loading state when user changes to show loading indicator
+    setLoading(true);
+    setSettings(null);
 
     fetch("/api/settings")
       .then((res) => res.json())
