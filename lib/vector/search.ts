@@ -24,9 +24,10 @@ export async function vectorSearch(
   const [queryEmbedding] = await generateEmbeddings([query]);
 
   // Build the query
+  // Use MIN_SIMILARITY_THRESHOLD to ensure consistency between RPC and fallback paths
   const { data, error } = await supabase.rpc("match_document_chunks", {
     query_embedding: queryEmbedding,
-    match_threshold: 0.1, // Lower threshold to capture more relevant results
+    match_threshold: MIN_SIMILARITY_THRESHOLD,
     match_count: topK,
     user_id: userId,
     document_id_filter: documentId || null,
@@ -75,13 +76,17 @@ export async function vectorSearch(
     return results;
   }
 
-  return (data || []).map((item: any) => ({
-    chunkId: item.id,
-    documentId: item.document_id,
-    content: item.content,
-    similarity: item.similarity || 0,
-    metadata: item.metadata,
-  }));
+  // Map RPC results - RPC already filtered by MIN_SIMILARITY_THRESHOLD and limited to topK
+  // No need for additional filtering or slicing since the database already applied these constraints
+  return (data || [])
+    .map((item: any) => ({
+      chunkId: item.id,
+      documentId: item.document_id,
+      content: item.content,
+      similarity: item.similarity || 0,
+      metadata: item.metadata,
+    }))
+    .sort((a: SearchResult, b: SearchResult) => b.similarity - a.similarity);
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {

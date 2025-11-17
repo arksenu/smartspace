@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
     // Load user settings as defaults
     const userSettings = await getSettings();
     const defaultProvider = userSettings?.provider || "openai";
-    const defaultModel = userSettings?.model || "gpt-4-turbo-preview";
-    const defaultTemperature = userSettings?.temperature ?? 0.7;
+    const defaultModel = userSettings?.model || "gpt-5.1";
+    const defaultTemperature = userSettings?.temperature ?? 1.0;
     const defaultSystemPrompt = userSettings?.systemPrompt;
     const defaultWebSearchEnabled = userSettings?.webSearchEnabled ?? false;
 

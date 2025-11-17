@@ -1,15 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export default function ChatPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [settings, setSettings] = useState<{ model?: string; provider?: string; webSearchEnabled?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
+  useEffect(() => {
+    // Only fetch settings if user is authenticated
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     fetch("/api/settings")
       .then((res) => res.json())
       .then((data) => {
@@ -23,7 +40,18 @@ export default function ChatPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [user]);
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="container mx-auto p-6 h-full">
+        <div className="flex items-center justify-center h-full">
+          <Skeleton className="h-8 w-64" />
+        </div>
+      </div>
+    );
+  }
 
   const modelName = settings?.model || "gpt-5.1";
   const webSearchEnabled = settings?.webSearchEnabled ?? false;
