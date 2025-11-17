@@ -118,7 +118,26 @@ export async function POST(request: NextRequest) {
     const activeSystemPrompt = conversationMeta?.system_prompt ?? defaultSystemPrompt;
 
     // Retrieve relevant chunks
-    const searchResults = await vectorSearch(message, user.id, 5);
+    // Use verified retrieval if enabled, otherwise use simple top-k retrieval
+    let searchResults;
+    const useVerifiedRetrieval = userSettings?.llmVerifiedRetrieval ?? false;
+    
+    if (useVerifiedRetrieval) {
+      console.log("[Chat Route] 🔍 LLM-Verified Retrieval Filter is ENABLED - using advanced filtering pipeline");
+      const { runVerifiedRetrieval } = await import("@/lib/vector/filter");
+      const verifiedResult = await runVerifiedRetrieval(message, user.id);
+      searchResults = verifiedResult.results;
+      
+      // If null-retrieval, log it but continue with empty results
+      if (verifiedResult.isNullRetrieval) {
+        console.log("[Chat Route] ⚠️ Verified retrieval returned null (all relevance scores = 0)");
+      } else {
+        console.log(`[Chat Route] ✅ Verified retrieval completed: ${searchResults.length} relevant chunks returned`);
+      }
+    } else {
+      console.log("[Chat Route] Using simple top-k retrieval (LLM-Verified Filter is OFF)");
+      searchResults = await vectorSearch(message, user.id, 5);
+    }
 
     // Get conversation history
     const historyContext = await getConversationHistory({
