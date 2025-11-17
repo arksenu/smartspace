@@ -35,23 +35,18 @@ export default function SettingsPage() {
   }, []);
 
   // Reset webSearchEnabled when provider changes away from OpenAI
-  // Restore saved webSearchEnabled when switching back to OpenAI
+  // Keep current state when switching back to OpenAI (preserve unsaved changes)
   useEffect(() => {
     // Skip on initial load (handled by loadSettings)
     if (loading) return;
 
+    // Only reset to false when switching away from OpenAI
+    // When switching back to OpenAI, preserve the current toggle state
     if (provider !== "openai") {
       setWebSearchEnabled(false);
-    } else {
-      // When switching to OpenAI, restore saved webSearchEnabled value
-      getSettings().then((settings) => {
-        if (settings?.provider === "openai") {
-          setWebSearchEnabled(settings.webSearchEnabled ?? DEFAULT_SETTINGS.webSearchEnabled);
-        }
-      }).catch((error) => {
-        console.error("Failed to load webSearchEnabled setting:", error);
-      });
     }
+    // Note: We don't restore saved settings when switching back to OpenAI
+    // This preserves any unsaved changes the user has made
   }, [provider, loading]);
 
   const loadSettings = async () => {
