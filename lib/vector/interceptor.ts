@@ -5,6 +5,7 @@ const groq = new Groq({
 });
 
 const INTERCEPTOR_MODEL = "openai/gpt-oss-120b";
+const FALLBACK_MODEL = "llama-3.1-70b-versatile"; // Fallback if primary model fails
 
 export interface RelevanceScore {
   chunkId: string;
@@ -41,40 +42,83 @@ document_chunk: ${documentChunk}
 
 Relevance score (0-4):`;
 
-  try {
-    const response = await groq.chat.completions.create({
-      model: INTERCEPTOR_MODEL,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      temperature: 0.1, // Low temperature for consistent scoring
-      max_tokens: 10, // Only need a single integer
-    });
+  // Try primary model first, fallback to alternative if it fails
+  const tryModel = async (modelName: string): Promise<number | null> => {
+    try {
+      const response = await groq.chat.completions.create({
+        model: modelName,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.1, // Low temperature for consistent scoring
+        max_tokens: 50, // Increased to ensure we get a response
+      });
 
-    const content = response.choices[0]?.message?.content?.trim() || "";
-    
-    // Extract integer from response (handle cases where LLM adds extra text)
-    const match = content.match(/\d+/);
-    if (!match) {
-      console.warn(`Failed to parse relevance score from: ${content}`);
-      return 0; // Default to no relation if parsing fails
+      // Log full response for debugging
+      if (!response.choices || response.choices.length === 0) {
+        console.error(`[Interceptor] Groq response has no choices for model ${modelName}:`, JSON.stringify(response, null, 2));
+        return null;
+      }
+
+      const choice = response.choices[0];
+      const content = choice?.message?.content?.trim() || "";
+      
+      // Log if content is empty
+      if (!content) {
+        console.error(`[Interceptor] Groq returned empty content for model ${modelName}. Full response:`, JSON.stringify({
+          finish_reason: choice?.finish_reason,
+          message: choice?.message,
+          response_id: (response as any).id,
+        }, null, 2));
+        return null;
+      }
+      
+      // Extract integer from response (handle cases where LLM adds extra text)
+      const match = content.match(/\d+/);
+      if (!match) {
+        console.warn(`[Interceptor] Failed to parse relevance score from: "${content}" for model ${modelName}. Full response:`, JSON.stringify(choice?.message, null, 2));
+        return null;
+      }
+
+      const score = parseInt(match[0], 10);
+      
+      // Clamp to valid range [0, 4]
+      if (score < 0) return 0;
+      if (score > 4) return 4;
+      
+      return score;
+    } catch (error) {
+      console.error(`[Interceptor] Error scoring relevance with Groq model ${modelName}:`, error);
+      if (error instanceof Error) {
+        console.error(`[Interceptor] Error message:`, error.message);
+        // Check if it's a model not found error
+        if (error.message.includes("model") || error.message.includes("not found") || error.message.includes("invalid")) {
+          console.warn(`[Interceptor] Model ${modelName} may not be available, will try fallback`);
+        }
+      }
+      return null;
     }
+  };
 
-    const score = parseInt(match[0], 10);
-    
-    // Clamp to valid range [0, 4]
-    if (score < 0) return 0;
-    if (score > 4) return 4;
-    
-    return score;
-  } catch (error) {
-    console.error("Error scoring relevance with Groq:", error);
-    // On error, return 0 (no relation) to be conservative
+  // Try primary model first
+  let score = await tryModel(INTERCEPTOR_MODEL);
+  
+  // If primary model fails, try fallback
+  if (score === null) {
+    console.log(`[Interceptor] Primary model ${INTERCEPTOR_MODEL} failed, trying fallback ${FALLBACK_MODEL}`);
+    score = await tryModel(FALLBACK_MODEL);
+  }
+  
+  // If both fail, return 0 (no relation) to be conservative
+  if (score === null) {
+    console.error("[Interceptor] Both models failed, returning 0");
     return 0;
   }
+  
+  return score;
 }
 
 /**
