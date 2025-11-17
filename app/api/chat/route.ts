@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { createClient } from "@/lib/supabase/server";
-import { vectorSearch } from "@/lib/vector/search";
+import { vectorSearch, MIN_SIMILARITY_THRESHOLD } from "@/lib/vector/search";
 import { buildPrompt } from "@/lib/rag/prompt-builder";
 import { getConversationHistory, updateConversationSummary } from "@/lib/chat/memory";
 import { saveMessage } from "@/lib/chat/save-message";
@@ -49,9 +49,10 @@ export async function POST(request: NextRequest) {
     // Load user settings as defaults
     const userSettings = await getSettings();
     const defaultProvider = userSettings?.provider || "openai";
-    const defaultModel = userSettings?.model || "gpt-4-turbo-preview";
-    const defaultTemperature = userSettings?.temperature ?? 0.7;
+    const defaultModel = userSettings?.model || "gpt-5.1";
+    const defaultTemperature = userSettings?.temperature ?? 1.0;
     const defaultSystemPrompt = userSettings?.systemPrompt;
+    const defaultWebSearchEnabled = userSettings?.webSearchEnabled ?? false;
 
     const { conversationId, message, provider = defaultProvider, model = defaultModel, temperature = defaultTemperature } = await request.json();
 
@@ -178,19 +179,28 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Send sources first
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "sources",
-                sources: searchResults.map((r) => ({
-                  chunkId: r.chunkId,
-                  content: r.content,
-                  similarity: r.similarity,
-                })),
-              })}\n\n`
-            )
-          );
+          // Send sources only if there are meaningful results
+          // Filter to only include sources that would display as at least 1% similarity
+          const meaningfulSources = searchResults.filter((r) => {
+            // Only filter out sources that are truly 0% or would round to 0%
+            const displayedPercent = Math.round(r.similarity * 100);
+            return r.similarity > MIN_SIMILARITY_THRESHOLD && displayedPercent > 0;
+          });
+
+          if (meaningfulSources.length > 0) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "sources",
+                  sources: meaningfulSources.map((r) => ({
+                    chunkId: r.chunkId,
+                    content: r.content,
+                    similarity: r.similarity,
+                  })),
+                })}\n\n`
+              )
+            );
+          }
 
           // Log the LLM request details
           console.log(`[Chat Route] Calling LLM with:`);
@@ -199,10 +209,13 @@ export async function POST(request: NextRequest) {
           console.log(`[Chat Route] - Temperature: ${temperature}`);
           console.log(`[Chat Route] - Message count: ${messages.length}`);
 
+          // Use web search setting from user settings if OpenAI provider
+          const webSearchEnabled = provider === "openai" ? defaultWebSearchEnabled : false;
+
           for await (const chunk of streamChatCompletion(
             provider as LLMProvider,
             messages,
-            { model, temperature }
+            { model, temperature, webSearchEnabled }
           )) {
             fullResponse += chunk.content;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));

@@ -13,12 +13,9 @@ interface StoredMessage {
 const MODEL_TOKEN_LIMITS: Record<string, number> = {
   "gpt-5.1": 400000,
   "gpt-5": 400000,
-  "gpt-4o": 128000,
-  "gpt-4o-mini": 128000,
   "gpt-4.1": 128000,
   "gpt-4.1-mini": 128000,
   "gpt-4.1-nano": 65536,
-  "gpt-3.5-turbo": 16385,
   "claude-opus-4.1": 1000000,
   "claude-opus-4.1-20250514": 1000000,
   "claude-opus-4": 1000000,
@@ -27,14 +24,15 @@ const MODEL_TOKEN_LIMITS: Record<string, number> = {
   "claude-sonnet-4.5-20250514": 1000000,
   "claude-sonnet-4": 1000000,
   "claude-sonnet-4-20250514": 1000000,
+  "claude-haiku-4-5-20251001": 200000,
   "openai/gpt-oss-120b": 40960,
   "llama-3.3-70b-versatile": 32768,
 };
 
 const SUMMARY_MODEL_FALLBACK: Partial<Record<LLMProvider, string>> = {
-  openai: "gpt-4o-mini",
-  anthropic: "claude-3-haiku-20240307",
-  groq: "mixtral-8x7b",
+  openai: "gpt-4.1-mini",
+  anthropic: "claude-haiku-4-5-20251001",
+  groq: "openai/gpt-oss-120b",
 };
 
 const DEFAULT_MODEL_TOKEN_LIMIT = 16000;

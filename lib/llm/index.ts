@@ -13,6 +13,7 @@ export interface LLMOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  webSearchEnabled?: boolean;
 }
 
 export async function* streamChatCompletion(

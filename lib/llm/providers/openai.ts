@@ -15,6 +15,7 @@ export async function* streamChatCompletion(
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    webSearchEnabled?: boolean;
   } = {}
 ): AsyncGenerator<StreamChunk, void, unknown> {
   if (!process.env.OPENAI_API_KEY) {
@@ -63,6 +64,10 @@ export async function* streamChatCompletion(
   console.log(`[OpenAI Provider] Model: ${modelToUse}`);
   console.log(`[OpenAI Provider] Temperature: ${options.temperature ?? 1.0}`);
   console.log(`[OpenAI Provider] Max Tokens: ${options.maxTokens ?? 'default'}`);
+  console.log(`[OpenAI Provider] Web Search Enabled: ${options.webSearchEnabled ?? false}`);
+
+  // Prepare tools array if web search is enabled
+  const tools = options.webSearchEnabled ? [{ type: "web_search" as const }] : undefined;
 
   try {
     const stream = await openai.responses.create({
@@ -71,6 +76,7 @@ export async function* streamChatCompletion(
       instructions: instructions,
       temperature: options.temperature ?? 1.0,
       max_output_tokens: options.maxTokens ?? undefined,
+      tools: tools,
       stream: true,
     });
 
@@ -123,8 +129,9 @@ export async function* streamChatCompletion(
       }
     }
   } catch (error) {
-    // If Responses API is not available, fall ba1ck to Chat Completions API
+    // If Responses API is not available, fall back to Chat Completions API
     // Don't fallback for response.failed/incomplete - those should propagate
+    // Note: Web search is only available with Responses API, not Chat Completions API
     if (error instanceof Error &&
       !error.message.includes('response.failed') &&
       !error.message.includes('response.incomplete') &&
@@ -132,6 +139,9 @@ export async function* streamChatCompletion(
       console.log(`[OpenAI Provider] ⚠️ Responses API not available: ${error.message}`);
       console.log(`[OpenAI Provider] Falling back to Chat Completions API`);
       console.log(`[OpenAI Provider] Model: ${modelToUse}`);
+      if (options.webSearchEnabled) {
+        console.log(`[OpenAI Provider] ⚠️ Web search is not available with Chat Completions API fallback`);
+      }
 
       // Fallback to Chat Completions API
       const stream = await openai.chat.completions.create({

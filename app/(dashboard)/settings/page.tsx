@@ -8,15 +8,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { saveSettings, getSettings } from "@/app/actions/settings/update";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const DEFAULT_SETTINGS = {
   provider: "openai",
-  model: "gpt-4-turbo-preview",
-  temperature: 0.7,
+  model: "gpt-5.1",
+  temperature: 1.0,
   systemPrompt: "",
+  webSearchEnabled: false,
 };
 
 export default function SettingsPage() {
@@ -24,6 +26,7 @@ export default function SettingsPage() {
   const [model, setModel] = useState(DEFAULT_SETTINGS.model);
   const [temperature, setTemperature] = useState([DEFAULT_SETTINGS.temperature]);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SETTINGS.systemPrompt);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(DEFAULT_SETTINGS.webSearchEnabled);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -31,14 +34,36 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
+  // Reset webSearchEnabled when provider changes away from OpenAI
+  // Keep current state when switching back to OpenAI (preserve unsaved changes)
+  useEffect(() => {
+    // Skip on initial load (handled by loadSettings)
+    if (loading) return;
+
+    // Only reset to false when switching away from OpenAI
+    // When switching back to OpenAI, preserve the current toggle state
+    if (provider !== "openai") {
+      setWebSearchEnabled(false);
+    }
+    // Note: We don't restore saved settings when switching back to OpenAI
+    // This preserves any unsaved changes the user has made
+  }, [provider, loading]);
+
   const loadSettings = async () => {
     try {
       const settings = await getSettings();
       if (settings) {
-        setProvider(settings.provider || DEFAULT_SETTINGS.provider);
+        const loadedProvider = settings.provider || DEFAULT_SETTINGS.provider;
+        setProvider(loadedProvider);
         setModel(settings.model || DEFAULT_SETTINGS.model);
         setTemperature([settings.temperature ?? DEFAULT_SETTINGS.temperature]);
         setSystemPrompt(settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt);
+        // Only load webSearchEnabled if provider is OpenAI, otherwise default to false
+        setWebSearchEnabled(
+          loadedProvider === "openai"
+            ? settings.webSearchEnabled ?? DEFAULT_SETTINGS.webSearchEnabled
+            : false
+        );
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
@@ -50,12 +75,25 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveSettings({
+      const settingsToSave: {
+        provider: string;
+        model: string;
+        temperature: number;
+        systemPrompt?: string;
+        webSearchEnabled?: boolean;
+      } = {
         provider,
         model,
         temperature: temperature[0],
         systemPrompt,
-      });
+      };
+
+      // Only include webSearchEnabled when provider is OpenAI
+      if (provider === "openai") {
+        settingsToSave.webSearchEnabled = webSearchEnabled;
+      }
+
+      await saveSettings(settingsToSave);
       toast.success("Settings saved successfully");
     } catch (error: any) {
       toast.error(error.message || "Failed to save settings");
@@ -134,6 +172,24 @@ export default function SettingsPage() {
               step={0.1}
             />
           </div>
+
+          {provider === "openai" && (
+            <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="web-search" className="text-base">
+                  Web Search
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable OpenAI's built-in web search tool for real-time information
+                </p>
+              </div>
+              <Switch
+                id="web-search"
+                checked={webSearchEnabled}
+                onCheckedChange={setWebSearchEnabled}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 

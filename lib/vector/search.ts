@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { generateEmbeddings } from "@/lib/embeddings";
 
+// Minimum similarity threshold to consider a source relevant (0.5% when displayed as percentage)
+export const MIN_SIMILARITY_THRESHOLD = 0.005;
+
 export interface SearchResult {
   chunkId: string;
   documentId: string;
@@ -21,9 +24,10 @@ export async function vectorSearch(
   const [queryEmbedding] = await generateEmbeddings([query]);
 
   // Build the query
+  // Use MIN_SIMILARITY_THRESHOLD to ensure consistency between RPC and fallback paths
   const { data, error } = await supabase.rpc("match_document_chunks", {
     query_embedding: queryEmbedding,
-    match_threshold: 0.5,
+    match_threshold: MIN_SIMILARITY_THRESHOLD,
     match_count: topK,
     user_id: userId,
     document_id_filter: documentId || null,
@@ -65,13 +69,15 @@ export async function vectorSearch(
           metadata: chunk.metadata,
         };
       })
-      .filter((r): r is SearchResult => r !== null)
+      .filter((r): r is SearchResult => r !== null && r.similarity > MIN_SIMILARITY_THRESHOLD)
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, topK);
 
     return results;
   }
 
+  // Map RPC results - RPC already filtered by MIN_SIMILARITY_THRESHOLD, sorted by similarity, and limited to topK
+  // No need for additional filtering, sorting, or slicing since the database already applied these constraints
   return (data || []).map((item: any) => ({
     chunkId: item.id,
     documentId: item.document_id,

@@ -9,6 +9,7 @@ export interface UserSettings {
   model: string;
   temperature: number;
   systemPrompt?: string;
+  webSearchEnabled?: boolean;
 }
 
 export async function saveSettings(settings: UserSettings) {
