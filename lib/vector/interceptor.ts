@@ -4,10 +4,11 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// User requested openai/gpt-oss-120b, but if it returns empty responses,
-// we'll fallback to llama-3.1-70b-versatile which is known to work
-const INTERCEPTOR_MODEL = "openai/gpt-oss-120b"; // User-requested model
-const FALLBACK_MODEL = "llama-3.1-70b-versatile"; // Fallback: known working model
+// User requested openai/gpt-oss-120b, but it appears to return empty responses
+// Using llama-3.1-70b-versatile as primary since it's known to work
+// If openai/gpt-oss-120b becomes available, we can switch back
+const INTERCEPTOR_MODEL = "llama-3.1-70b-versatile"; // Primary: known working model
+const FALLBACK_MODEL = "openai/gpt-oss-120b"; // Fallback: user-requested model (currently not working)
 
 export interface RelevanceScore {
   chunkId: string;
@@ -28,21 +29,21 @@ export async function scoreRelevance(
     throw new Error("GROQ_API_KEY is not set");
   }
 
-  const prompt = `Given the user_query and document_chunk, classify relevance.
+  // Simplified prompt that's more likely to work with Groq models
+  const prompt = `Classify the relevance of this document chunk to the user query.
 
-Output ONLY an integer 0–4.
+User query: ${userQuery}
 
-0 = no semantic relation.
-1 = minimal or tangential relation.
-2 = partially relevant.
-3 = strongly relevant.
-4 = directly answers or significantly supports the query.
+Document chunk: ${documentChunk}
 
-user_query: ${userQuery}
+Rate the relevance from 0 to 4:
+- 0 = no semantic relation
+- 1 = minimal or tangential relation  
+- 2 = partially relevant
+- 3 = strongly relevant
+- 4 = directly answers or significantly supports the query
 
-document_chunk: ${documentChunk}
-
-Relevance score (0-4):`;
+Output only the number (0, 1, 2, 3, or 4):`;
 
   // Helper to sleep/delay
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -139,11 +140,11 @@ Relevance score (0-4):`;
     }
   };
 
-  // Try primary model first, but log that we're trying it
+  // Try primary model first (known working model)
   console.log(`[Interceptor] Attempting to score relevance with model: ${INTERCEPTOR_MODEL}`);
   let score = await tryModel(INTERCEPTOR_MODEL);
   
-  // If primary model fails, try fallback immediately
+  // If primary model fails, try fallback (user-requested model)
   if (score === null) {
     console.log(`[Interceptor] Primary model ${INTERCEPTOR_MODEL} returned null, trying fallback ${FALLBACK_MODEL}`);
     score = await tryModel(FALLBACK_MODEL);
