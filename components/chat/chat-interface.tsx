@@ -5,6 +5,8 @@ import { MessageList } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { SourcesPanel } from "./sources-panel";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface Message {
   id: string;
@@ -24,6 +26,14 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
   const [streaming, setStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>(initialConversationId);
   const [userSettings, setUserSettings] = useState<{ provider?: string; model?: string; temperature?: number; webSearchEnabled?: boolean } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    // Load collapsed state from localStorage on mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sources-sidebar-collapsed');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -33,6 +43,13 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Save collapsed state to localStorage whenever it changes
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sources-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
+    }
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     // Load user settings
@@ -104,19 +121,19 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
 
             try {
               const parsed = JSON.parse(data);
-              
+
               // Handle conversation ID (for new conversations)
               if (parsed.type === "conversation" && parsed.conversationId) {
                 setConversationId(parsed.conversationId);
                 continue;
               }
-              
-              // Handle sources
+
+              // Handle sources - store all sources from backend (already filtered there)
               if (parsed.type === "sources" && parsed.sources) {
                 setSources(parsed.sources);
                 continue;
               }
-              
+
               // Handle content chunks
               if (parsed.content) {
                 assistantMessage.content += parsed.content;
@@ -148,9 +165,10 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
     }
   };
 
+
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
-      <div className="flex-1 flex flex-col">
+    <div className="flex h-[calc(100vh-4rem)] relative">
+      <div className="flex-1 flex flex-col min-w-0">
         <Card className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-y-auto p-4">
             <MessageList messages={messages} streaming={streaming} />
@@ -161,11 +179,25 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
           </div>
         </Card>
       </div>
-      {sources.length > 0 && (
-        <div className="w-80 border-l">
-          <SourcesPanel sources={sources} />
-        </div>
-      )}
+
+      {/* Collapse/Expand button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute right-0 top-4 z-10 rounded-l-md rounded-r-none h-12 w-6 bg-background border-l border-t border-b"
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        style={{ right: sidebarCollapsed ? 0 : '400px' }}
+      >
+        {sidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      </Button>
+
+      {/* Sources sidebar - always visible, can be collapsed */}
+      <div
+        className={`border-l flex-shrink-0 overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'w-0' : 'w-[400px]'
+          }`}
+      >
+        <SourcesPanel sources={sources} />
+      </div>
     </div>
   );
 }

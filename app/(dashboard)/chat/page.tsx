@@ -45,8 +45,8 @@ export default function ChatPage() {
                 <span className="font-medium">Model:</span> {modelName}
               </div>
               {isOpenAI && (
-                <Badge 
-                  variant={webSearchEnabled ? "default" : "outline"} 
+                <Badge
+                  variant={webSearchEnabled ? "default" : "outline"}
                   className={`gap-1.5 ${webSearchEnabled ? "" : "text-muted-foreground"}`}
                 >
                   <span className="text-xs">🌐</span>

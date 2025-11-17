@@ -26,7 +26,7 @@ export function buildPrompt(options: BuildPromptOptions): Array<{ role: "user" |
 
   // Build the full prompt (system prompt is already in system message, don't duplicate)
   const fullPrompt = `Context from documents:
-${contextText}
+${contextText}  
 
 Based on the context above, please answer the following question. If the context doesn't contain enough information, please say so. If the user asked a question
 which doesn't appear to be asking about the context, just answer the question.
