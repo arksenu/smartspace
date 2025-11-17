@@ -4,11 +4,11 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// User requested openai/gpt-oss-120b, but it appears to return empty responses
-// Using llama-3.1-70b-versatile as primary since it's known to work
-// If openai/gpt-oss-120b becomes available, we can switch back
-const INTERCEPTOR_MODEL = "llama-3.1-70b-versatile"; // Primary: known working model
-const FALLBACK_MODEL = "openai/gpt-oss-120b"; // Fallback: user-requested model (currently not working)
+// User requested openai/gpt-oss-120b - it's a reasoning model that outputs to reasoning field
+// Using llama-3.3-70b-versatile as primary (current model, llama-3.1 was decommissioned)
+// openai/gpt-oss-120b as fallback (requires extracting from reasoning field)
+const INTERCEPTOR_MODEL = "llama-3.3-70b-versatile"; // Primary: current working model
+const FALLBACK_MODEL = "openai/gpt-oss-120b"; // Fallback: user-requested reasoning model
 
 export interface RelevanceScore {
   chunkId: string;
@@ -63,7 +63,7 @@ Output only the number (0, 1, 2, 3, or 4):`;
           },
         ],
         temperature: 0.1, // Low temperature for consistent scoring
-        max_tokens: 50, // Increased to ensure we get a response
+        max_tokens: 200, // Increased significantly for reasoning models (they need reasoning + answer tokens)
       });
 
       // Log full response for debugging
@@ -73,31 +73,45 @@ Output only the number (0, 1, 2, 3, or 4):`;
       }
 
       const choice = response.choices[0];
-      const content = choice?.message?.content?.trim() || "";
+      let content = choice?.message?.content?.trim() || "";
+      
+      // For reasoning models (like openai/gpt-oss-120b), the answer might be in the reasoning field
+      // Check reasoning field if content is empty
+      if (!content && (choice?.message as any)?.reasoning) {
+        const reasoning = (choice?.message as any).reasoning.trim();
+        console.log(`[Interceptor] Model ${modelName} returned reasoning instead of content. Reasoning: ${reasoning.substring(0, 200)}...`);
+        // Try to extract score from reasoning
+        content = reasoning;
+      }
       
       // Log full response for debugging (always log to see what we're getting)
       console.log(`[Interceptor] Groq response for model ${modelName}:`, JSON.stringify({
         finish_reason: choice?.finish_reason,
         content: content || "(empty)",
+        has_reasoning: !!(choice?.message as any)?.reasoning,
         message_role: choice?.message?.role,
         response_id: (response as any).id,
         usage: (response as any).usage,
       }, null, 2));
       
-      // Log if content is empty
+      // Log if content is still empty
       if (!content) {
         console.error(`[Interceptor] Groq returned empty content for model ${modelName}. Full response object:`, JSON.stringify(response, null, 2));
         return null;
       }
       
       // Extract integer from response (handle cases where LLM adds extra text)
-      const match = content.match(/\d+/);
-      if (!match) {
-        console.warn(`[Interceptor] Failed to parse relevance score from: "${content}" for model ${modelName}. Full choice:`, JSON.stringify(choice, null, 2));
+      // Look for the last number in the response (most likely to be the final answer)
+      const numbers = content.match(/\d+/g);
+      if (!numbers || numbers.length === 0) {
+        console.warn(`[Interceptor] Failed to parse relevance score from: "${content.substring(0, 200)}..." for model ${modelName}. Full choice:`, JSON.stringify(choice, null, 2));
         return null;
       }
+      
+      // Use the last number found (most likely the final answer after reasoning)
+      const match = numbers[numbers.length - 1];
 
-      const score = parseInt(match[0], 10);
+      const score = parseInt(match, 10);
       
       // Clamp to valid range [0, 4]
       if (score < 0) return 0;
