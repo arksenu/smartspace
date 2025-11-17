@@ -109,132 +109,140 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <Skeleton className="h-10 w-48 mb-2" />
-          <Skeleton className="h-5 w-96" />
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Skeleton className="h-6 w-32 bg-white/5" />
+          <Skeleton className="h-3 w-64 bg-white/5" />
         </div>
         <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-4 w-24 bg-white/5" />
+            <Skeleton className="h-8 w-full bg-white/5" />
+            <Skeleton className="h-8 w-full bg-white/5" />
+            <Skeleton className="h-8 w-full bg-white/5" />
+          </div>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Settings</h1>
-        <p className="text-muted-foreground">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold tracking-tight text-white/80">Settings</h1>
+        <p className="text-xs text-[#8C8C92]">
           Configure your AI model preferences and system behavior
         </p>
       </div>
 
+      {/* Model Settings */}
       <Card>
-        <CardHeader>
-          <CardTitle>Model Settings</CardTitle>
-          <CardDescription>Choose your preferred AI model and provider</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Provider</Label>
-            <Select value={provider} onValueChange={setProvider}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
-                <SelectItem value="groq">Groq</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="p-4">
+          <div className="mb-4">
+            <CardTitle className="text-sm font-medium mb-1">Model Settings</CardTitle>
+            <CardDescription className="text-xs">Choose your preferred AI model and provider</CardDescription>
           </div>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#8C8C92]">Provider</Label>
+              <Select value={provider} onValueChange={setProvider}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                  <SelectItem value="groq">Groq</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Model</Label>
-            <Input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="Model name"
-            />
-          </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#8C8C92]">Model</Label>
+              <Input
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="Model name"
+                className="h-8 text-sm"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Temperature: {temperature[0]}</Label>
-            <Slider
-              value={temperature}
-              onValueChange={setTemperature}
-              min={0}
-              max={1}
-              step={0.1}
-            />
-          </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-[#8C8C92]">Temperature</Label>
+                <span className="text-xs text-[#CFCFD3] font-medium">{temperature[0]}</span>
+              </div>
+              <Slider
+                value={temperature}
+                onValueChange={setTemperature}
+                min={0}
+                max={1}
+                step={0.1}
+                className="py-2"
+              />
+            </div>
 
-          {provider === "openai" && (
-            <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="web-search" className="text-base">
-                  Web Search
+            {provider === "openai" && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 p-3 bg-white/5">
+                <div className="space-y-0.5 flex-1">
+                  <Label htmlFor="web-search" className="text-xs font-medium text-[#CFCFD3]">
+                    Web Search
+                  </Label>
+                  <p className="text-xs text-[#8C8C92] leading-relaxed">
+                    Enable OpenAI's built-in web search tool for real-time information
+                  </p>
+                </div>
+                <Switch
+                  id="web-search"
+                  checked={webSearchEnabled}
+                  onCheckedChange={setWebSearchEnabled}
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 p-3 bg-white/5">
+              <div className="space-y-0.5 flex-1">
+                <Label htmlFor="llm-verified-retrieval" className="text-xs font-medium text-[#CFCFD3] flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  AI-Powered Retrieval Filtering
                 </Label>
-                <p className="text-sm text-muted-foreground">
-                  Enable OpenAI's built-in web search tool for real-time information
+                <p className="text-xs text-[#8C8C92] leading-relaxed">
+                  Use advanced LLM-based filtering to improve retrieval quality. When ON, uses Groq to verify chunk relevance before retrieval.
                 </p>
               </div>
               <Switch
-                id="web-search"
-                checked={webSearchEnabled}
-                onCheckedChange={setWebSearchEnabled}
+                id="llm-verified-retrieval"
+                checked={llmVerifiedRetrieval}
+                onCheckedChange={setLlmVerifiedRetrieval}
               />
             </div>
-          )}
-
-          <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
-            <div className="space-y-0.5">
-              <Label htmlFor="llm-verified-retrieval" className="text-base flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                AI-Powered Retrieval Filtering
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Use advanced LLM-based filtering to improve retrieval quality. When ON, uses Groq to verify chunk relevance before retrieval.
-              </p>
-            </div>
-            <Switch
-              id="llm-verified-retrieval"
-              checked={llmVerifiedRetrieval}
-              onCheckedChange={setLlmVerifiedRetrieval}
-            />
           </div>
-        </CardContent>
+        </div>
       </Card>
 
+      {/* System Prompt */}
       <Card>
-        <CardHeader>
-          <CardTitle>System Prompt</CardTitle>
-          <CardDescription>Customize the system prompt for AI responses</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Prompt</Label>
+        <div className="p-4">
+          <div className="mb-4">
+            <CardTitle className="text-sm font-medium mb-1">System Prompt</CardTitle>
+            <CardDescription className="text-xs">Customize the system prompt for AI responses</CardDescription>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-[#8C8C92]">Prompt</Label>
             <Textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder="Enter custom system prompt..."
-              rows={6}
-              className="resize-none"
+              rows={4}
+              className="resize-none text-sm"
             />
           </div>
-        </CardContent>
+        </div>
       </Card>
 
-      <Button onClick={handleSave} disabled={saving}>
+      {/* Save Button */}
+      <Button onClick={handleSave} disabled={saving} className="h-8 text-xs">
         {saving ? "Saving..." : "Save Settings"}
       </Button>
     </div>

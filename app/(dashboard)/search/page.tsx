@@ -84,16 +84,25 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Semantic Search</h1>
-        <p className="text-muted-foreground">
+    <div className="space-y-4">
+      {/* Header Section */}
+      <div className="space-y-1 animate-fade-in-up">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
+            <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight text-white/80">Semantic Search</h1>
+        </div>
+        <p className="text-xs text-[#8C8C92] max-w-2xl">
           Search across your documents using AI-powered semantic search
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        <div className="md:col-span-3 space-y-4">
+      {/* Search Interface */}
+      <div className="grid gap-3 md:grid-cols-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+        <div className="md:col-span-3">
           <SearchBar
             query={query}
             onQueryChange={setQuery}
@@ -112,12 +121,17 @@ export default function SearchPage() {
         </div>
       </div>
 
+      {/* Results */}
       {results.length > 0 && (
-        <SearchResults results={results} query={query} documentTitles={documentTitles} />
+        <div className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <SearchResults results={results} query={query} documentTitles={documentTitles} />
+        </div>
       )}
 
       {results.length === 0 && !loading && query && (
-        <SearchResults results={[]} query={query} />
+        <div className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <SearchResults results={[]} query={query} />
+        </div>
       )}
     </div>
   );

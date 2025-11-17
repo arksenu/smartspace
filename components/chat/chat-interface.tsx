@@ -170,11 +170,14 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
     <div className="flex h-[calc(100vh-4rem)] relative">
       <div className="flex-1 flex flex-col min-w-0">
         <Card className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* Chat messages area */}
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
             <MessageList messages={messages} streaming={streaming} />
             <div ref={messagesEndRef} />
           </div>
-          <div className="border-t p-4">
+
+          {/* Input area with matte effect */}
+          <div className="border-t border-white/5 p-6 bg-[#1A1A1D]">
             <ChatInput onSend={handleSend} disabled={streaming} />
           </div>
         </Card>
@@ -184,7 +187,7 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
       <Button
         variant="ghost"
         size="icon"
-        className="absolute right-0 top-4 z-10 rounded-l-md rounded-r-none h-12 w-6 bg-background border-l border-t border-b"
+        className="absolute right-0 top-4 z-10 rounded-l-2xl rounded-r-none h-12 w-8 bg-[#1A1A1D] border-l border-t border-b border-white/5 hover:bg-white/10 transition-all duration-200"
         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         style={{ right: sidebarCollapsed ? 0 : '400px' }}
       >
@@ -193,7 +196,7 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
 
       {/* Sources sidebar - always visible, can be collapsed */}
       <div
-        className={`border-l flex-shrink-0 overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'w-0' : 'w-[400px]'
+        className={`border-l border-white/5 flex-shrink-0 overflow-hidden transition-all duration-300 matte-panel ${sidebarCollapsed ? 'w-0' : 'w-[400px]'
           }`}
       >
         <SourcesPanel sources={sources} />
