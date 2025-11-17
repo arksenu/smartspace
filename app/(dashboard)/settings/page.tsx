@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { saveSettings, getSettings } from "@/app/actions/settings/update";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sparkles } from "lucide-react";
 
 const DEFAULT_SETTINGS = {
   provider: "openai",
@@ -197,8 +198,9 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
             <div className="space-y-0.5">
-              <Label htmlFor="llm-verified-retrieval" className="text-base">
-                LLM-Verified Retrieval Filtering
+              <Label htmlFor="llm-verified-retrieval" className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                AI-Powered Retrieval Filtering
               </Label>
               <p className="text-sm text-muted-foreground">
                 Use advanced LLM-based filtering to improve retrieval quality. When ON, uses Groq to verify chunk relevance before retrieval.

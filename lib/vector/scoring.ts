@@ -37,14 +37,18 @@ export function normalizeScores(chunks: SearchResult[]): ScoredChunk[] {
 export function removeOutliers(chunks: ScoredChunk[]): ScoredChunk[] {
   if (chunks.length === 0) return [];
 
+  // If only one chunk, keep it (can't remove outliers from a single item)
+  if (chunks.length === 1) return chunks;
+
   // Sort by normalized score (ascending)
   const sorted = [...chunks].sort((a, b) => a.normalizedScore - b.normalizedScore);
 
-  // Calculate cutoff index (keep top 85%)
-  const cutoffIndex = Math.ceil(sorted.length * 0.15);
+  // Calculate how many items to remove (bottom 15%)
+  // Ensure we always keep at least 1 chunk
+  const itemsToRemove = Math.min(Math.floor(sorted.length * 0.15), sorted.length - 1);
 
   // Return top 85% (remove bottom 15%)
-  return sorted.slice(cutoffIndex);
+  return sorted.slice(itemsToRemove);
 }
 
 /**
