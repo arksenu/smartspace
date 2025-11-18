@@ -66,32 +66,32 @@ export default function ChatPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 animate-fade-in-up">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-primary/10 border border-primary/20">
-            <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4 animate-fade-in-up">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
+            <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white/80">Chat</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-white/80">Chat</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {loading ? (
             <>
-              <Skeleton className="h-6 w-32 rounded-2xl bg-white/5" />
-              {(!settings || settings.provider === "openai") && <Skeleton className="h-6 w-24 rounded-2xl bg-white/5" />}
+              <Skeleton className="h-6 w-28 rounded-2xl bg-white/5" />
+              {(!settings || settings.provider === "openai") && <Skeleton className="h-6 w-20 rounded-2xl bg-white/5" />}
             </>
           ) : (
             <>
-              <div className="text-sm px-3 py-1.5 rounded-2xl bg-[#1A1A1D] border border-white/5 text-[#CFCFD3]">
-                <span className="font-medium text-[#8C8C92]">Model:</span>{" "}
+              <div className="text-xs px-2.5 py-1 rounded-2xl bg-[#1A1A1D] border border-white/5 text-[#CFCFD3]">
+                <span className="text-[#8C8C92]">Model:</span>{" "}
                 <span className="text-[#CFCFD3]">{modelName}</span>
               </div>
               {isOpenAI && (
                 <Badge
                   variant={webSearchEnabled ? "default" : "outline"}
                   className={cn(
-                    "gap-1.5 px-3 py-1.5 rounded-2xl",
+                    "gap-1 px-2 py-1 text-xs rounded-2xl h-6",
                     webSearchEnabled
                       ? "bg-green-500/10 text-green-400 border-green-500/20"
                       : "text-[#8C8C92] border-white/5"

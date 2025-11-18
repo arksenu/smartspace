@@ -4,6 +4,7 @@ A production-grade, AI-powered web application for document ingestion, semantic 
 
 ## Features
 
+### Core Features
 - **Document Management**: Upload PDFs, text files, or ingest content from URLs
 - **AI-Powered Chat**: Chat with your documents using RAG (Retrieval-Augmented Generation)
 - **Adaptive Chat Memory**: Automatically summarizes long conversations and optimizes context windows to stay within model limits
@@ -11,6 +12,25 @@ A production-grade, AI-powered web application for document ingestion, semantic 
 - **Multi-Provider LLM Support**: OpenAI, Anthropic, and Groq
 - **Analytics Dashboard**: Track usage, tokens, and performance metrics
 - **Real-time Streaming**: Get AI responses streamed in real-time
+
+### Advanced Features
+- **LLM-Verified Retrieval Filter**: Advanced retrieval pipeline that uses AI to verify chunk relevance before retrieval
+  - Score normalization (z-score)
+  - Statistical outlier removal
+  - Maximal Marginal Relevance (MMR) for diversity
+  - Near-duplicate detection and removal
+  - LLM-based relevance scoring using Groq
+- **Web Search Integration**: Enable OpenAI's built-in web search tool for real-time information (OpenAI provider only)
+- **Customizable Settings**: 
+  - Custom system prompts
+  - Model and provider selection
+  - Temperature control
+  - Web search toggle
+  - LLM-verified retrieval toggle
+- **Advanced Vector Search**: 
+  - MMR (Maximal Marginal Relevance) for diverse results
+  - Near-duplicate detection
+  - Score normalization and outlier filtering
 
 ## Tech Stack
 
@@ -53,9 +73,11 @@ Fill in your environment variables:
 - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `ANTHROPIC_API_KEY`: Your Anthropic API key (optional)
-- `GROQ_API_KEY`: Your Groq API key (optional)
+- `OPENAI_API_KEY`: Your OpenAI API key (required for embeddings, optional for chat)
+- `ANTHROPIC_API_KEY`: Your Anthropic API key (optional, for chat)
+- `GROQ_API_KEY`: Your Groq API key (optional, for chat and LLM-verified retrieval)
+
+**Note**: At minimum, you need `OPENAI_API_KEY` for embeddings. For chat functionality, you need at least one of: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GROQ_API_KEY`. The LLM-verified retrieval feature requires `GROQ_API_KEY`.
 
 4. Set up Supabase:
    - Create a new Supabase project
@@ -129,10 +151,15 @@ smartspace/
 │   ├── auth/             # Auth utilities
 │   ├── ingestion/        # Document ingestion pipeline
 │   ├── embeddings/       # Embedding generation
-│   ├── vector/           # Vector search
-│   ├── llm/              # LLM providers
+│   ├── vector/           # Vector search and retrieval
+│   │   ├── search.ts     # Basic vector search
+│   │   ├── scoring.ts    # MMR, normalization, deduplication
+│   │   ├── filter.ts     # LLM-verified retrieval pipeline
+│   │   ├── interceptor.ts # LLM-based relevance scoring
+│   │   └── retrieval.ts  # Top-k chunk retrieval
+│   ├── llm/              # LLM providers (OpenAI, Anthropic, Groq)
 │   ├── rag/              # RAG utilities
-│   └── chat/             # Chat utilities
+│   └── chat/             # Chat utilities (memory management)
 ├── db/                    # Database schema (Drizzle ORM)
 └── supabase/             # Supabase migrations
 ```
@@ -140,11 +167,21 @@ smartspace/
 ## Usage
 
 1. **Sign Up/Login**: Create an account or sign in
-2. **Upload Documents**: Go to Documents page and upload PDFs or text files
-3. **Wait for Processing**: Documents are automatically processed and indexed
-4. **Chat**: Go to Chat page and ask questions about your documents
-5. **Search**: Use Semantic Search to find specific information
-6. **Analytics**: View your usage statistics in Analytics
+2. **Upload Documents**: Go to Documents page and upload PDFs, text files, or ingest content from URLs
+3. **Wait for Processing**: Documents are automatically processed, chunked, and indexed with vector embeddings
+4. **Configure Settings** (optional): Go to Settings page to customize:
+   - Your preferred AI model and provider
+   - Temperature settings
+   - Custom system prompts
+   - Enable web search (OpenAI only)
+   - Enable LLM-verified retrieval filtering
+5. **Chat**: Go to Chat page and ask questions about your documents. The system will:
+   - Retrieve relevant document chunks using vector similarity
+   - Optionally filter results using LLM-verified retrieval
+   - Maintain conversation context with automatic summarization
+   - Stream responses in real-time
+6. **Search**: Use Semantic Search to find specific information across your documents
+7. **Analytics**: View your usage statistics, token consumption, and performance metrics in Analytics
 
 ## Deployment
 
@@ -161,6 +198,35 @@ smartspace/
 2. Run migrations
 3. Configure storage buckets
 4. Set up production auth settings
+
+## Advanced Configuration
+
+### LLM-Verified Retrieval Filter
+
+The LLM-Verified Retrieval Filter is an advanced feature that improves retrieval quality by using AI to verify chunk relevance. When enabled, it:
+
+1. Retrieves top-k chunks (k_max = 10)
+2. Normalizes similarity scores using z-score normalization
+3. Removes statistical outliers (bottom 15%)
+4. Applies Maximal Marginal Relevance (MMR) for diversity
+5. Removes near-duplicates (cosine similarity > 0.95)
+6. Scores relevance using Groq LLM (0-3 scale)
+7. Keeps chunks with relevance score >= 2
+
+Enable this feature in Settings → AI-Powered Retrieval Filtering. Requires `GROQ_API_KEY`.
+
+### Chat Memory System
+
+The adaptive memory system automatically:
+- Tracks token usage per model (supports GPT-4, Claude Opus, Sonnet, Haiku, and more)
+- Summarizes conversations when they exceed token limits
+- Preserves recent messages (last 6 by default)
+- Manages context windows dynamically based on model capabilities
+- Handles model-specific token limits (up to 1M tokens for Claude Opus)
+
+### Web Search (OpenAI Only)
+
+When using OpenAI as your provider, you can enable web search in Settings. This allows the model to search the web for real-time information beyond your documents. Requires OpenAI provider and is only available with OpenAI's Responses API.
 
 ## License
 

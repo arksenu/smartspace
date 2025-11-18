@@ -171,13 +171,13 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
       <div className="flex-1 flex flex-col min-w-0">
         <Card className="flex-1 overflow-hidden flex flex-col">
           {/* Chat messages area */}
-          <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             <MessageList messages={messages} streaming={streaming} />
             <div ref={messagesEndRef} />
           </div>
 
           {/* Input area with matte effect */}
-          <div className="border-t border-white/5 p-6 bg-[#1A1A1D]">
+          <div className="border-t border-white/5 p-4 bg-[#1A1A1D]">
             <ChatInput onSend={handleSend} disabled={streaming} />
           </div>
         </Card>
