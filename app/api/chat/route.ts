@@ -9,6 +9,10 @@ import { streamChatCompletion, LLMProvider } from "@/lib/llm";
 import { logEval } from "@/lib/analytics/logger";
 import { getSettings } from "@/app/actions/settings/update";
 import { get_encoding, TiktokenEncoding } from "tiktoken";
+import { withRetry } from "@/lib/utils/retry";
+import { jobQueue, JobType } from "@/lib/queue";
+import { initializeJobProcessors } from "@/lib/queue/processors";
+import { performanceTracker, OperationType } from "@/lib/analytics/performance";
 
 // Helper function to count tokens accurately
 function countTokens(text: string, encodingName: TiktokenEncoding = "cl100k_base"): number {
@@ -42,6 +46,10 @@ function countMessageTokens(messages: Array<{ role: string; content: string }>, 
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+
+  // Initialize job processors on first request
+  initializeJobProcessors();
+
   const user = await requireAuth();
   const supabase = await createClient();
 
@@ -121,13 +129,17 @@ export async function POST(request: NextRequest) {
     // Use verified retrieval if enabled, otherwise use simple top-k retrieval
     let searchResults;
     const useVerifiedRetrieval = userSettings?.llmVerifiedRetrieval ?? false;
-    
+
     if (useVerifiedRetrieval) {
       console.log("[Chat Route] 🔍 LLM-Verified Retrieval Filter is ENABLED - using advanced filtering pipeline");
       const { runVerifiedRetrieval } = await import("@/lib/vector/filter");
-      const verifiedResult = await runVerifiedRetrieval(message, user.id);
+      const verifiedResult = await performanceTracker.measure(
+        OperationType.RELEVANCE_SCORING,
+        () => runVerifiedRetrieval(message, user.id),
+        { verified_retrieval: true }
+      );
       searchResults = verifiedResult.results;
-      
+
       // If null-retrieval, log it but continue with empty results
       if (verifiedResult.isNullRetrieval) {
         console.log("[Chat Route] ⚠️ Verified retrieval returned null (all relevance scores = 0)");
@@ -136,7 +148,11 @@ export async function POST(request: NextRequest) {
       }
     } else {
       console.log("[Chat Route] Using simple top-k retrieval (LLM-Verified Filter is OFF)");
-      searchResults = await vectorSearch(message, user.id, 5);
+      searchResults = await performanceTracker.measure(
+        OperationType.VECTOR_SEARCH,
+        () => vectorSearch(message, user.id, 5),
+        { verified_retrieval: false }
+      );
     }
 
     // Get conversation history
@@ -155,14 +171,38 @@ export async function POST(request: NextRequest) {
       userQuery: message,
     });
 
-    // Save user message
-    await saveMessage({
-      conversationId: convId,
-      userId: user.id,
-      role: "user",
-      content: message,
-      retrievedChunkIds: searchResults.map((r) => r.chunkId),
-    });
+    // Save user message with retry mechanism - this is critical data
+    try {
+      await withRetry(
+        () => saveMessage({
+          conversationId: convId,
+          userId: user.id,
+          role: "user",
+          content: message,
+          retrievedChunkIds: searchResults.map((r) => r.chunkId),
+        }),
+        {
+          maxAttempts: 3,
+          initialDelayMs: 100,
+          onRetry: (error, attempt) => {
+            console.error(`Failed to save user message (attempt ${attempt}/3):`, error);
+          }
+        }
+      );
+    } catch (error) {
+      console.error("Failed to save user message after all retries:", error);
+      // Return error response instead of continuing with potentially lost data
+      return new Response(
+        JSON.stringify({
+          error: "Failed to save message. Please try again.",
+          details: error instanceof Error ? error.message : "Unknown error",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Stream response
     const stream = new ReadableStream({
@@ -247,40 +287,145 @@ export async function POST(request: NextRequest) {
           const inputTokens = countMessageTokens(messages);
           const outputTokens = countTokens(fullResponse);
 
-          await saveMessage({
-            conversationId: convId,
-            userId: user.id,
-            role: "assistant",
-            content: fullResponse,
-            retrievedChunkIds: searchResults.map((r) => r.chunkId),
-            tokensUsed: outputTokens,
-            modelUsed: model,
-            latencyMs,
+          // Send metrics data to the frontend before closing the stream
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "metrics",
+                latencyMs,
+                inputTokens,
+                outputTokens,
+                totalTokens: inputTokens + outputTokens,
+              })}\n\n`
+            )
+          );
+
+          // Save assistant message with retry - critical for conversation history
+          // We'll save it async but add to a queue if it fails
+          const saveAssistantMessage = async () => {
+            try {
+              await withRetry(
+                () => saveMessage({
+                  conversationId: convId,
+                  userId: user.id,
+                  role: "assistant",
+                  content: fullResponse,
+                  retrievedChunkIds: searchResults.map((r) => r.chunkId),
+                  tokensUsed: outputTokens,
+                  modelUsed: model,
+                  latencyMs,
+                }),
+                {
+                  maxAttempts: 3,
+                  initialDelayMs: 200,
+                  onRetry: (error, attempt) => {
+                    console.error(`Failed to save assistant message (attempt ${attempt}/3):`, error);
+                  }
+                }
+              );
+            } catch (error) {
+              console.error("Failed to save assistant message after retries:", error);
+              // Add to job queue for later retry
+              await jobQueue.addJob(JobType.SAVE_MESSAGE, {
+                conversationId: convId,
+                userId: user.id,
+                role: "assistant",
+                content: fullResponse,
+                retrievedChunkIds: searchResults.map((r) => r.chunkId),
+                tokensUsed: outputTokens,
+                modelUsed: model,
+                latencyMs,
+              });
+              console.log("Added assistant message to job queue for retry");
+            }
+          };
+
+          // Log evaluation with retry but don't let it block
+          const logEvaluation = async () => {
+            try {
+              await withRetry(
+                () => logEval({
+                  userId: user.id,
+                  conversationId: convId,
+                  provider,
+                  model: model || "default",
+                  tokensInput: inputTokens,
+                  tokensOutput: outputTokens,
+                  latencyMs,
+                }),
+                {
+                  maxAttempts: 2, // Less critical, fewer retries
+                  initialDelayMs: 500,
+                  onRetry: (error, attempt) => {
+                    console.error(`Failed to log evaluation (attempt ${attempt}/2):`, error);
+                  }
+                }
+              );
+            } catch (error) {
+              console.error("Failed to log evaluation after retries:", error);
+              // Add to job queue for later retry
+              await jobQueue.addJob(JobType.LOG_EVAL, {
+                userId: user.id,
+                conversationId: convId,
+                provider,
+                model: model || "default",
+                tokensInput: inputTokens,
+                tokensOutput: outputTokens,
+                latencyMs,
+              });
+              console.log("Added evaluation logging to job queue for retry");
+            }
+          };
+
+          // Execute both operations in parallel, but don't block the response
+          Promise.all([saveAssistantMessage(), logEvaluation()]).catch((err) => {
+            console.error("Unexpected error in post-response operations:", err);
           });
 
-          // Log evaluation
-          await logEval({
-            userId: user.id,
-            conversationId: convId,
-            provider,
-            model: model || "default",
-            tokensInput: inputTokens,
-            tokensOutput: outputTokens,
-            latencyMs,
-          });
-
+          // Update conversation summary with retry (non-critical operation)
           if (useMemory) {
-            updateConversationSummary({
-              conversationId: convId,
-              userId: user.id,
-              provider: provider as LLMProvider,
-              model,
-            }).catch((err) => {
-              console.error("Failed to update conversation summary", err);
+            const updateSummary = async () => {
+              try {
+                await withRetry(
+                  () => updateConversationSummary({
+                    conversationId: convId,
+                    userId: user.id,
+                    provider: provider as LLMProvider,
+                    model,
+                  }),
+                  {
+                    maxAttempts: 2,
+                    initialDelayMs: 1000,
+                    onRetry: (error, attempt) => {
+                      console.error(`Failed to update summary (attempt ${attempt}/2):`, error);
+                    }
+                  }
+                );
+              } catch (error) {
+                console.error("Failed to update conversation summary after retries:", error);
+                // Add to job queue for later retry
+                await jobQueue.addJob(JobType.UPDATE_SUMMARY, {
+                  conversationId: convId,
+                  userId: user.id,
+                  provider: provider as LLMProvider,
+                  model,
+                });
+                console.log("Added summary update to job queue for retry");
+              }
+            };
+
+            updateSummary().catch((err) => {
+              console.error("Unexpected error updating summary:", err);
             });
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+
+          // Try to flush performance metrics at end of request
+          performanceTracker.flushMetrics().catch(() => {
+            // Silently ignore flush errors
+          });
+
           controller.close();
         } catch (error) {
           controller.error(error);
