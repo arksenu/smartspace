@@ -22,10 +22,10 @@ export function SearchResults({ results, query, documentTitles = {} }: SearchRes
   if (results.length === 0) {
     return (
       <Card>
-        <CardContent className="p-12 text-center">
-          <File className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">No results found</p>
-          <p className="text-sm text-muted-foreground mt-2">
+        <CardContent className="p-8 text-center">
+          <File className="mx-auto h-8 w-8 text-[#8C8C92] mb-3" />
+          <p className="text-sm text-[#8C8C92]">No results found</p>
+          <p className="text-xs text-[#8C8C92] mt-1">
             Try adjusting your search query or filters
           </p>
         </CardContent>
@@ -34,11 +34,11 @@ export function SearchResults({ results, query, documentTitles = {} }: SearchRes
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Results ({results.length})</h2>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-medium text-white/80">Results ({results.length})</h2>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-2">
         {results.map((result, index) => (
           <ResultItem
             key={result.chunkId}

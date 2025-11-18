@@ -46,7 +46,7 @@ export function ResultHighlight({ text, query, maxLength = 500 }: ResultHighligh
     // Highlight query words
     queryWords.forEach((word) => {
       const regex = new RegExp(`(${word})`, "gi");
-      excerpt = excerpt.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-900">$1</mark>');
+      excerpt = excerpt.replace(regex, '<mark class="bg-primary/20 text-primary font-medium">$1</mark>');
     });
 
     return excerpt;
@@ -54,7 +54,7 @@ export function ResultHighlight({ text, query, maxLength = 500 }: ResultHighligh
 
   return (
     <p
-      className="text-sm leading-relaxed"
+      className="text-xs leading-relaxed text-[#CFCFD3]"
       dangerouslySetInnerHTML={{ __html: highlightedText }}
     />
   );

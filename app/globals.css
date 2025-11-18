@@ -4,58 +4,50 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Soft Charcoal Matte Theme - ChatGPT Style */
+    /* Background: #0F0F12 -> hsl(240, 8%, 6%) */
+    --background: 240 8% 6%;
+    /* Text Primary: #CFCFD3 -> hsl(240, 5%, 81%) */
+    --foreground: 240 5% 81%;
+    /* Matte panel: #1A1A1D -> hsl(240, 5%, 11%) */
+    --card: 240 5% 11%;
+    --card-foreground: 240 5% 81%;
+    --popover: 240 5% 11%;
+    --popover-foreground: 240 5% 81%;
+    /* Soft purple accent: #9C88FF -> hsl(252, 100%, 77%) */
+    --primary: 252 100% 77%;
+    --primary-foreground: 240 8% 6%;
+    /* Secondary: darker matte */
+    --secondary: 240 5% 13%;
+    --secondary-foreground: 240 5% 81%;
+    --muted: 240 5% 11%;
+    /* Text Secondary: #8C8C92 -> hsl(240, 3%, 57%) */
+    --muted-foreground: 240 3% 57%;
+    --accent: 252 100% 77% / 0.1;
+    --accent-foreground: 240 5% 81%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    /* Low-contrast border: border-white/5 */
+    --border: 0 0% 100% / 0.05;
+    --input: 240 5% 11%;
+    --ring: 252 100% 77%;
+    --chart-1: 252 100% 77%;
+    --chart-2: 280 70% 60%;
+    --chart-3: 340 75% 55%;
+    --chart-4: 12 76% 61%;
+    --chart-5: 173 58% 39%;
+    --radius: 1rem;
+    
+    /* Extended Design Tokens - Soft Matte */
+    --gradient-from: 252 100% 77%;
+    --gradient-via: 280 70% 60%;
+    --gradient-to: 340 75% 55%;
+    /* Matte panel background */
+    --matte-bg: 240 5% 11%;
+    /* Low-contrast border */
+    --matte-border: 0 0% 100% / 0.05;
+    /* Subtle shadow */
+    --shadow-subtle: 0 0 40px -10px rgba(0, 0, 0, 0.45);
   }
 }
 
@@ -63,8 +55,209 @@
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #0F0F12;
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  
+  /* Enhanced Typography - Soft Matte */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+    letter-spacing: -0.02em;
+    color: rgba(255, 255, 255, 0.8);
+  }
+  
+  h1 {
+    @apply text-4xl md:text-5xl;
+    letter-spacing: -0.03em;
+  }
+  
+  h2 {
+    @apply text-3xl md:text-4xl;
+  }
+  
+  h3 {
+    @apply text-2xl md:text-3xl;
+  }
+  
+  h4 {
+    @apply text-xl md:text-2xl;
+  }
+}
+
+@layer utilities {
+  /* Matte Panels - ChatGPT Style */
+  .matte-panel {
+    background: #1A1A1D;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+    box-shadow: 0 0 40px -10px rgba(0, 0, 0, 0.45);
+  }
+  
+  .matte-card {
+    background: #1A1A1D;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+    box-shadow: 0 0 40px -10px rgba(0, 0, 0, 0.45);
+  }
+  
+  .matte-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+    transition: all 0.2s;
+  }
+  
+  .matte-button:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  
+  /* Gradient Text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      to right,
+      hsl(var(--gradient-from)),
+      hsl(var(--gradient-via)),
+      hsl(var(--gradient-to))
+    );
+  }
+  
+  /* Gradient Border */
+  .gradient-border {
+    position: relative;
+    background: hsl(var(--card));
+    border-radius: var(--radius);
+  }
+  
+  .gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--gradient-from)),
+      hsl(var(--gradient-via)),
+      hsl(var(--gradient-to))
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  
+  /* Spotlight Effect */
+  .spotlight {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      hsl(var(--primary) / 0.1),
+      transparent
+    );
+    pointer-events: none;
+  }
+  
+  /* Smooth Transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Subtle Noise Texture */
+  .noise {
+    position: relative;
+  }
+  
+  .noise::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+  
+  /* Card Depth - Subtle Shadows */
+  .card-depth {
+    box-shadow: 0 0 40px -10px rgba(0, 0, 0, 0.45);
+  }
+  
+  .card-depth-hover {
+    @apply transition-smooth;
+    box-shadow: 0 0 40px -10px rgba(0, 0, 0, 0.45);
+  }
+  
+  .card-depth-hover:hover {
+    box-shadow: 
+      0 0 50px -10px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(156, 136, 255, 0.2);
+    transform: translateY(-2px);
+  }
+  
+  /* Animated Gradient Background */
+  .animated-gradient {
+    background: linear-gradient(
+      -45deg,
+      hsl(var(--gradient-from)),
+      hsl(var(--gradient-via)),
+      hsl(var(--gradient-to)),
+      hsl(var(--gradient-from))
+    );
+    background-size: 400% 400%;
+    animation: gradient-shift 15s ease infinite;
+  }
+  
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  
+  /* Section Separator - Low Contrast */
+  .section-separator {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgba(255, 255, 255, 0.05),
+      transparent
+    );
+  }
+  
+  /* Soft Purple Glow Effects */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(156, 136, 255, 0.2);
+  }
+  
+  .glow-primary-hover:hover {
+    box-shadow: 0 0 30px rgba(156, 136, 255, 0.3);
+  }
+  
+  /* Top Gradient Overlay - Subtle */
+  .gradient-top {
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.02),
+      transparent
+    );
   }
 }
 

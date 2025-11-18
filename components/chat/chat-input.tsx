@@ -3,7 +3,8 @@
 import { useState, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send } from "lucide-react";
+import { Send, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -12,6 +13,7 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [message, setMessage] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleSend = () => {
     if (message.trim() && !disabled) {
@@ -28,17 +30,53 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   return (
-    <div className="flex gap-2">
-      <Textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Type your message..."
-        disabled={disabled}
-        className="min-h-[60px] resize-none"
-      />
-      <Button onClick={handleSend} disabled={disabled || !message.trim()} size="icon">
-        <Send className="h-4 w-4" />
+    <div className="relative flex gap-3">
+      {/* Matte input container */}
+      <div className={cn(
+        "relative flex-1 rounded-2xl border transition-all duration-200",
+        "bg-[#1A1A1D] border-white/5",
+        isFocused 
+          ? "border-primary/50 ring-2 ring-primary/30" 
+          : "hover:border-white/10"
+      )}>
+        <Textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder="Type your message..."
+          disabled={disabled}
+          className={cn(
+            "min-h-[60px] resize-none border-0 bg-transparent text-[#CFCFD3]",
+            "focus-visible:ring-0 focus-visible:ring-offset-0",
+            "placeholder:text-[#8C8C92]/60"
+          )}
+        />
+        {/* Decorative corner accent */}
+        {isFocused && (
+          <div className="absolute top-0 right-0 w-2 h-2 bg-primary/20 rounded-bl-full" />
+        )}
+      </div>
+      
+      <Button 
+        onClick={handleSend} 
+        disabled={disabled || !message.trim()} 
+        size="icon"
+        className={cn(
+          "h-[60px] w-[60px] rounded-2xl transition-all duration-200",
+          "hover:scale-105 active:scale-95",
+          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+          message.trim() && !disabled 
+            ? "bg-white/10 border border-white/5 hover:bg-white/15 hover:border-primary/30" 
+            : "bg-white/5 border border-white/5"
+        )}
+      >
+        {disabled ? (
+          <Sparkles className="h-5 w-5 animate-pulse" />
+        ) : (
+          <Send className="h-5 w-5" />
+        )}
       </Button>
     </div>
   );
