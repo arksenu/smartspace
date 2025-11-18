@@ -12,7 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { saveSettings, getSettings } from "@/app/actions/settings/update";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const DEFAULT_SETTINGS = {
   provider: "openai",
@@ -127,124 +128,138 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-white/80">Settings</h1>
-        <p className="text-xs text-[#8C8C92]">
-          Configure your AI model preferences and system behavior
-        </p>
-      </div>
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold tracking-tight text-white/80">Settings</h1>
+          <p className="text-xs text-[#8C8C92]">
+            Configure your AI model preferences and system behavior
+          </p>
+        </div>
 
-      {/* Model Settings */}
-      <Card>
-        <div className="p-4">
-          <div className="mb-4">
-            <CardTitle className="text-sm font-medium mb-1">Model Settings</CardTitle>
-            <CardDescription className="text-xs">Choose your preferred AI model and provider</CardDescription>
-          </div>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-[#8C8C92]">Provider</Label>
-              <Select value={provider} onValueChange={setProvider}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="groq">Groq</SelectItem>
-                </SelectContent>
-              </Select>
+        {/* Model Settings */}
+        <Card>
+          <div className="p-4">
+            <div className="mb-4">
+              <CardTitle className="text-sm font-medium mb-1">Model Settings</CardTitle>
+              <CardDescription className="text-xs">Choose your preferred AI model and provider</CardDescription>
             </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs text-[#8C8C92]">Model</Label>
-              <Input
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="Model name"
-                className="h-8 text-sm"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-[#8C8C92]">Temperature</Label>
-                <span className="text-xs text-[#CFCFD3] font-medium">{temperature[0]}</span>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-[#8C8C92]">Provider</Label>
+                <Select value={provider} onValueChange={setProvider}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                    <SelectItem value="anthropic">Anthropic</SelectItem>
+                    <SelectItem value="groq">Groq</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Slider
-                value={temperature}
-                onValueChange={setTemperature}
-                min={0}
-                max={1}
-                step={0.1}
-                className="py-2"
-              />
-            </div>
 
-            {provider === "openai" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-[#8C8C92]">Model</Label>
+                <Input
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="Model name"
+                  className="h-8 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-[#8C8C92]">Temperature</Label>
+                  <span className="text-xs text-[#CFCFD3] font-medium">{temperature[0]}</span>
+                </div>
+                <Slider
+                  value={temperature}
+                  onValueChange={setTemperature}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  className="py-2"
+                />
+              </div>
+
+              {provider === "openai" && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 p-3 bg-white/5">
+                  <div className="space-y-0.5 flex-1">
+                    <Label htmlFor="web-search" className="text-xs font-medium text-[#CFCFD3]">
+                      Web Search
+                    </Label>
+                    <p className="text-xs text-[#8C8C92] leading-relaxed">
+                      Enable OpenAI's built-in web search tool for real-time information
+                    </p>
+                  </div>
+                  <Switch
+                    id="web-search"
+                    checked={webSearchEnabled}
+                    onCheckedChange={setWebSearchEnabled}
+                  />
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 p-3 bg-white/5">
                 <div className="space-y-0.5 flex-1">
-                  <Label htmlFor="web-search" className="text-xs font-medium text-[#CFCFD3]">
-                    Web Search
+                  <Label htmlFor="llm-verified-retrieval" className="text-xs font-medium text-[#CFCFD3] flex items-center gap-1.5">
+                    <Sparkles className="h-3 w-3 text-primary" />
+                    AI-Powered Retrieval Filtering
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="inline-flex items-center">
+                          <Info className="h-3 w-3 text-[#8C8C92] hover:text-[#CFCFD3] transition-colors" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-[200px]">
+                          Uses AI to verify chunk relevance before retrieval, improving answer quality by filtering out irrelevant content.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   </Label>
                   <p className="text-xs text-[#8C8C92] leading-relaxed">
-                    Enable OpenAI's built-in web search tool for real-time information
+                    Use advanced LLM-based filtering to improve retrieval quality. When ON, uses Groq to verify chunk relevance before retrieval.
                   </p>
                 </div>
                 <Switch
-                  id="web-search"
-                  checked={webSearchEnabled}
-                  onCheckedChange={setWebSearchEnabled}
+                  id="llm-verified-retrieval"
+                  checked={llmVerifiedRetrieval}
+                  onCheckedChange={setLlmVerifiedRetrieval}
                 />
               </div>
-            )}
+            </div>
+          </div>
+        </Card>
 
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 p-3 bg-white/5">
-              <div className="space-y-0.5 flex-1">
-                <Label htmlFor="llm-verified-retrieval" className="text-xs font-medium text-[#CFCFD3] flex items-center gap-1.5">
-                  <Sparkles className="h-3 w-3 text-primary" />
-                  AI-Powered Retrieval Filtering
-                </Label>
-                <p className="text-xs text-[#8C8C92] leading-relaxed">
-                  Use advanced LLM-based filtering to improve retrieval quality. When ON, uses Groq to verify chunk relevance before retrieval.
-                </p>
-              </div>
-              <Switch
-                id="llm-verified-retrieval"
-                checked={llmVerifiedRetrieval}
-                onCheckedChange={setLlmVerifiedRetrieval}
+        {/* System Prompt */}
+        <Card>
+          <div className="p-4">
+            <div className="mb-4">
+              <CardTitle className="text-sm font-medium mb-1">System Prompt</CardTitle>
+              <CardDescription className="text-xs">Customize the system prompt for AI responses</CardDescription>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#8C8C92]">Prompt</Label>
+              <Textarea
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="Enter custom system prompt..."
+                rows={4}
+                className="resize-none text-sm"
               />
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      {/* System Prompt */}
-      <Card>
-        <div className="p-4">
-          <div className="mb-4">
-            <CardTitle className="text-sm font-medium mb-1">System Prompt</CardTitle>
-            <CardDescription className="text-xs">Customize the system prompt for AI responses</CardDescription>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-[#8C8C92]">Prompt</Label>
-            <Textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="Enter custom system prompt..."
-              rows={4}
-              className="resize-none text-sm"
-            />
-          </div>
-        </div>
-      </Card>
-
-      {/* Save Button */}
-      <Button onClick={handleSave} disabled={saving} className="h-8 text-xs">
-        {saving ? "Saving..." : "Save Settings"}
-      </Button>
-    </div>
+        {/* Save Button */}
+        <Button onClick={handleSave} disabled={saving} className="h-8 text-xs">
+          {saving ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
+    </TooltipProvider>
   );
 }

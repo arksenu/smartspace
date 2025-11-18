@@ -30,7 +30,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   return (
-    <div className="relative flex gap-3">
+    <div className="relative flex gap-2">
       {/* Matte input container */}
       <div className={cn(
         "relative flex-1 rounded-2xl border transition-all duration-200",
@@ -48,14 +48,14 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           placeholder="Type your message..."
           disabled={disabled}
           className={cn(
-            "min-h-[60px] resize-none border-0 bg-transparent text-[#CFCFD3]",
+            "min-h-[48px] resize-none border-0 bg-transparent text-sm text-[#CFCFD3]",
             "focus-visible:ring-0 focus-visible:ring-offset-0",
             "placeholder:text-[#8C8C92]/60"
           )}
         />
         {/* Decorative corner accent */}
         {isFocused && (
-          <div className="absolute top-0 right-0 w-2 h-2 bg-primary/20 rounded-bl-full" />
+          <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-primary/20 rounded-bl-full" />
         )}
       </div>
       
@@ -64,7 +64,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         disabled={disabled || !message.trim()} 
         size="icon"
         className={cn(
-          "h-[60px] w-[60px] rounded-2xl transition-all duration-200",
+          "h-[48px] w-[48px] rounded-2xl transition-all duration-200 shrink-0",
           "hover:scale-105 active:scale-95",
           "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
           message.trim() && !disabled 
@@ -73,9 +73,9 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         )}
       >
         {disabled ? (
-          <Sparkles className="h-5 w-5 animate-pulse" />
+          <Sparkles className="h-4 w-4 animate-pulse" />
         ) : (
-          <Send className="h-5 w-5" />
+          <Send className="h-4 w-4" />
         )}
       </Button>
     </div>
