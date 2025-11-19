@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
       const { runVerifiedRetrieval } = await import("@/lib/vector/filter");
       const verifiedResult = await performanceTracker.measure(
         OperationType.RELEVANCE_SCORING,
-        () => runVerifiedRetrieval(message, user.id),
+        () => runVerifiedRetrieval(message, user.id, undefined, false),
         { verified_retrieval: true }
       );
       searchResults = verifiedResult.results;

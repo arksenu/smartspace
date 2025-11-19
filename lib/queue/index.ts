@@ -239,7 +239,7 @@ class JobQueue {
         .select();
     } catch (error: any) {
       // Silently ignore cookie context errors - job is already in memory queue
-      if (!error?.message?.includes('cookies') || !error?.message?.includes('request scope')) {
+      if (!error?.message?.includes('cookies') && !error?.message?.includes('request scope')) {
         throw error;
       }
     }
@@ -258,7 +258,7 @@ class JobQueue {
         .eq('id', jobId);
     } catch (error: any) {
       // Silently ignore cookie context errors
-      if (!error?.message?.includes('cookies') || !error?.message?.includes('request scope')) {
+      if (!error?.message?.includes('cookies') && !error?.message?.includes('request scope')) {
         throw error;
       }
     }
@@ -283,7 +283,7 @@ class JobQueue {
         });
     } catch (error: any) {
       // Silently ignore cookie context errors - we'll try again on next request
-      if (!error?.message?.includes('cookies') || !error?.message?.includes('request scope')) {
+      if (!error?.message?.includes('cookies') && !error?.message?.includes('request scope')) {
         console.error('Failed to log failed job:', error);
       }
     }
