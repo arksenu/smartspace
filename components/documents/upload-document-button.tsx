@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { UploadZone, UploadZoneRef } from "./upload-zone";
+import { ElectronFilePicker } from "./electron-file-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ingestUrl } from "@/app/actions/documents/upload";
@@ -107,6 +108,16 @@ export function UploadDocumentButton() {
           <TabsContent value="file">
             <div className="space-y-4">
               <UploadZone ref={uploadZoneRef} />
+              <div className="flex gap-2">
+                {typeof window !== "undefined" && (window as any).electronAPI && (
+                  <ElectronFilePicker
+                    onFilesSelected={(files) => {
+                      uploadZoneRef.current?.addFiles(files);
+                      toast.success(`Added ${files.length} file(s)`);
+                    }}
+                  />
+                )}
+              </div>
               <Button
                 onClick={handleFileUpload}
                 disabled={uploading}

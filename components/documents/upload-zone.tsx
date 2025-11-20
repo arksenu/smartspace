@@ -14,6 +14,7 @@ interface UploadZoneProps {
 export interface UploadZoneRef {
   getFiles: () => File[];
   clearFiles: () => void;
+  addFiles: (files: File[]) => void;
 }
 
 export const UploadZone = forwardRef<UploadZoneRef, UploadZoneProps>(
@@ -23,6 +24,7 @@ export const UploadZone = forwardRef<UploadZoneRef, UploadZoneProps>(
     useImperativeHandle(ref, () => ({
       getFiles: () => files,
       clearFiles: () => setFiles([]),
+      addFiles: (newFiles: File[]) => setFiles((prev) => [...prev, ...newFiles]),
     }));
 
     const onDrop = useCallback(

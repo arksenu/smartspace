@@ -5,6 +5,12 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  // Output standalone for Electron
+  output: process.env.ELECTRON_BUILD === 'true' ? 'standalone' : undefined,
+  // Disable image optimization in Electron (not needed)
+  images: {
+    unoptimized: process.env.ELECTRON_BUILD === 'true',
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Ensure canvas is treated as optional (used by some PDF libraries)

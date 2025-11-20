@@ -19,17 +19,23 @@ export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const supabase = createClient();
 
+  const isElectron = typeof window !== "undefined" && (window as any).electronAPI;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (mode === "signup") {
+        const redirectTo = isElectron 
+          ? `smartspace://auth/callback`
+          : `${window.location.origin}/auth/callback`;
+        
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: redirectTo,
           },
         });
 
@@ -62,10 +68,14 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     setLoading(true);
     try {
+      const redirectTo = isElectron 
+        ? `smartspace://auth/callback`
+        : `${window.location.origin}/auth/callback`;
+      
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectTo,
         },
       });
 

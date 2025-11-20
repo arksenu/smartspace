@@ -3,11 +3,19 @@
   "version": "1.0.0",
   "description": "A production-grade, AI-powered web application for document ingestion, semantic search, and LLM-powered reasoning.",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev -p 3004",
     "build": "next build",
     "start": "next start -p 3004",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3004 && electron .\"",
+    "electron:build": "ELECTRON_BUILD=true npm run build && electron-builder",
+    "electron:pack": "ELECTRON_BUILD=true npm run build && electron-builder --dir",
+    "electron:dist": "ELECTRON_BUILD=true npm run build && electron-builder --publish=never",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
@@ -52,6 +60,13 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.1.0",
+    "electron-is-dev": "^2.0.0",
+    "concurrently": "^8.2.0",
+    "wait-on": "^8.0.1",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -60,6 +75,7 @@
     "eslint-config-next": "^14.2.0",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "@playwright/test": "^1.56.1"
   }
 }
