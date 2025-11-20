@@ -163,11 +163,15 @@ class PerformanceTracker {
         throw cookieError;
       }
 
+      // Get the current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+
       const records = metricsToFlush.map(metric => ({
         operation: metric.operation,
         duration_ms: metric.duration_ms,
         metadata: metric.metadata,
         recorded_at: new Date().toISOString(),
+        user_id: user?.id || null,
       }));
 
       await supabase
@@ -220,11 +224,19 @@ class PerformanceTracker {
   ): Promise<PerformanceStats[]> {
     const supabase = await createClient();
 
+    // Get the current user ID for filtering
+    const { data: { user } } = await supabase.auth.getUser();
+
     let query = supabase
       .from('performance_metrics')
       .select('*')
       .gte('recorded_at', startTime.toISOString())
       .lte('recorded_at', endTime.toISOString());
+
+    // Filter by user_id to ensure data isolation
+    if (user?.id) {
+      query = query.eq('user_id', user.id);
+    }
 
     if (operations && operations.length > 0) {
       query = query.in('operation', operations);
@@ -258,9 +270,9 @@ class PerformanceTracker {
         operation,
         count,
         avg_ms: Math.round(sorted.reduce((a, b) => a + b, 0) / count),
-        p50_ms: sorted[Math.floor(count * 0.5)],
-        p95_ms: sorted[Math.floor(count * 0.95)],
-        p99_ms: sorted[Math.floor(count * 0.99)],
+        p50_ms: sorted[Math.ceil(count * 0.5) - 1],
+        p95_ms: sorted[Math.ceil(count * 0.95) - 1],
+        p99_ms: sorted[Math.ceil(count * 0.99) - 1],
         min_ms: sorted[0],
         max_ms: sorted[count - 1],
       });
@@ -280,12 +292,22 @@ class PerformanceTracker {
   ): Promise<Record<string, PerformanceStats>> {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
+    // Get the current user ID for filtering
+    const { data: { user } } = await supabase.auth.getUser();
+
+    let query = supabase
       .from('performance_metrics')
       .select('*')
       .eq('operation', operation)
       .gte('recorded_at', startTime.toISOString())
       .lte('recorded_at', endTime.toISOString());
+
+    // Filter by user_id to ensure data isolation
+    if (user?.id) {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Failed to get operation breakdown: ${error.message}`);
@@ -305,9 +327,9 @@ class PerformanceTracker {
           operation,
           count,
           avg_ms: Math.round(allDurations.reduce((a, b) => a + b, 0) / count),
-          p50_ms: allDurations[Math.floor(count * 0.5)],
-          p95_ms: allDurations[Math.floor(count * 0.95)],
-          p99_ms: allDurations[Math.floor(count * 0.99)],
+          p50_ms: allDurations[Math.ceil(count * 0.5) - 1],
+          p95_ms: allDurations[Math.ceil(count * 0.95) - 1],
+          p99_ms: allDurations[Math.ceil(count * 0.99) - 1],
           min_ms: allDurations[0],
           max_ms: allDurations[count - 1],
         },
@@ -334,9 +356,9 @@ class PerformanceTracker {
         operation,
         count,
         avg_ms: Math.round(sorted.reduce((a, b) => a + b, 0) / count),
-        p50_ms: sorted[Math.floor(count * 0.5)],
-        p95_ms: sorted[Math.floor(count * 0.95)],
-        p99_ms: sorted[Math.floor(count * 0.99)],
+        p50_ms: sorted[Math.ceil(count * 0.5) - 1],
+        p95_ms: sorted[Math.ceil(count * 0.95) - 1],
+        p99_ms: sorted[Math.ceil(count * 0.99) - 1],
         min_ms: sorted[0],
         max_ms: sorted[count - 1],
       };
