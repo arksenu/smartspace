@@ -17,10 +17,17 @@ export async function saveSettings(settings: UserSettings) {
   const user = await requireAuth();
   const supabase = await createClient();
 
+  // Default llmVerifiedRetrieval to false for better performance
+  // (LLM-verified retrieval can add 5-10 seconds to response time)
+  const optimizedSettings = {
+    ...settings,
+    llmVerifiedRetrieval: settings.llmVerifiedRetrieval ?? false,
+  };
+
   const { error } = await supabase
     .from("profiles")
     .update({
-      settings: settings,
+      settings: optimizedSettings,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
@@ -47,7 +54,14 @@ export async function getSettings(): Promise<UserSettings | null> {
     return null;
   }
 
-  return data.settings as UserSettings | null;
+  const settings = data.settings as UserSettings | null;
+  
+  // Default llmVerifiedRetrieval to false if not set
+  if (settings && settings.llmVerifiedRetrieval === undefined) {
+    settings.llmVerifiedRetrieval = false;
+  }
+
+  return settings;
 }
 
 

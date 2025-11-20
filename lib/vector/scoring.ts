@@ -71,32 +71,53 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return denominator === 0 ? 0 : dotProduct / denominator;
 }
 
+// Add interface to track embeddings through the pipeline
+export interface ScoredChunkWithEmbedding extends ScoredChunk {
+  embedding?: number[];
+}
+
 /**
  * Apply Maximal Marginal Relevance (MMR) for diversity
  * Uses chunk embeddings to compute actual chunk-to-chunk similarity
  * @param chunks Chunks to re-rank
  * @param lambda Balance between relevance (1.0) and diversity (0.0). Default 0.5
+ * @param existingEmbeddings Optional pre-computed embeddings to avoid regeneration
+ * @returns Chunks with MMR scores and their embeddings for reuse
  */
-export async function applyMMR(chunks: ScoredChunk[], lambda: number = 0.5): Promise<ScoredChunk[]> {
-  if (chunks.length === 0) return [];
+export async function applyMMR(
+  chunks: ScoredChunk[],
+  lambda: number = 0.5,
+  existingEmbeddings?: number[][]
+): Promise<{ chunks: ScoredChunkWithEmbedding[]; embeddings: number[][] }> {
+  if (chunks.length === 0) return { chunks: [], embeddings: [] };
 
   // If only one chunk, no need for MMR
   if (chunks.length === 1) {
-    return [{ ...chunks[0], mmrScore: chunks[0].similarity }];
+    const embedding = existingEmbeddings?.[0];
+    if (embedding) {
+      return {
+        chunks: [{ ...chunks[0], mmrScore: chunks[0].similarity, embedding }],
+        embeddings: [embedding]
+      };
+    }
+    const [newEmbedding] = await generateEmbeddings([chunks[0].content]);
+    return {
+      chunks: [{ ...chunks[0], mmrScore: chunks[0].similarity, embedding: newEmbedding }],
+      embeddings: [newEmbedding]
+    };
   }
 
-  // Generate embeddings for all chunks (needed for chunk-to-chunk similarity)
-  const contents = chunks.map((c) => c.content);
-  const embeddings = await generateEmbeddings(contents);
+  // Use existing embeddings if provided, otherwise generate them
+  const embeddings = existingEmbeddings || await generateEmbeddings(chunks.map(c => c.content));
 
-  const selected: ScoredChunk[] = [];
+  const selected: ScoredChunkWithEmbedding[] = [];
   const selectedIndices: number[] = [];
   const remaining = chunks.map((chunk, idx) => ({ chunk, idx, embedding: embeddings[idx] }));
 
   // Start with the highest similarity chunk
   remaining.sort((a, b) => b.chunk.similarity - a.chunk.similarity);
   const first = remaining.shift()!;
-  selected.push({ ...first.chunk, mmrScore: first.chunk.similarity });
+  selected.push({ ...first.chunk, mmrScore: first.chunk.similarity, embedding: first.embedding });
   selectedIndices.push(first.idx);
 
   // For remaining chunks, calculate MMR score
@@ -125,11 +146,11 @@ export async function applyMMR(chunks: ScoredChunk[], lambda: number = 0.5): Pro
     }
 
     const best = remaining.splice(bestIdx, 1)[0];
-    selected.push({ ...best.chunk, mmrScore: bestMMR });
+    selected.push({ ...best.chunk, mmrScore: bestMMR, embedding: best.embedding });
     selectedIndices.push(best.idx);
   }
 
-  return selected;
+  return { chunks: selected, embeddings };
 }
 
 /**
@@ -138,16 +159,21 @@ export async function applyMMR(chunks: ScoredChunk[], lambda: number = 0.5): Pro
  * Reuses embeddings if provided (for efficiency when called after MMR)
  */
 export async function removeNearDuplicates(
-  chunks: ScoredChunk[],
+  chunks: ScoredChunkWithEmbedding[],
   embeddings?: number[][]
 ): Promise<ScoredChunk[]> {
   if (chunks.length === 0) return [];
 
-  // Generate embeddings if not provided
+  // Use embeddings from chunks if they have them (from MMR), otherwise use provided embeddings
   let chunkEmbeddings: number[][];
-  if (embeddings && embeddings.length === chunks.length) {
+  const hasEmbeddingsInChunks = chunks[0].embedding !== undefined;
+
+  if (hasEmbeddingsInChunks) {
+    chunkEmbeddings = chunks.map(c => c.embedding!);
+  } else if (embeddings && embeddings.length === chunks.length) {
     chunkEmbeddings = embeddings;
   } else {
+    // Only generate if we absolutely have to
     const contents = chunks.map((c) => c.content);
     chunkEmbeddings = await generateEmbeddings(contents);
   }
@@ -170,7 +196,9 @@ export async function removeNearDuplicates(
     }
 
     if (!isDuplicate) {
-      kept.push(chunk);
+      // Remove the embedding field before returning to keep the result clean
+      const { embedding: _, ...cleanChunk } = chunk as ScoredChunkWithEmbedding;
+      kept.push(cleanChunk as ScoredChunk);
       keptEmbeddings.push(embedding);
     }
   }

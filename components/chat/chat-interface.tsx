@@ -13,6 +13,12 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Array<{ chunkId: string; content: string; similarity: number }>;
+  metrics?: {
+    latencyMs: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
 }
 
 interface ChatInterfaceProps {
@@ -131,6 +137,23 @@ export function ChatInterface({ conversationId: initialConversationId, initialMe
               // Handle sources - store all sources from backend (already filtered there)
               if (parsed.type === "sources" && parsed.sources) {
                 setSources(parsed.sources);
+                continue;
+              }
+
+              // Handle metrics data
+              if (parsed.type === "metrics") {
+                assistantMessage.metrics = {
+                  latencyMs: parsed.latencyMs,
+                  inputTokens: parsed.inputTokens,
+                  outputTokens: parsed.outputTokens,
+                  totalTokens: parsed.totalTokens,
+                };
+
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { ...assistantMessage };
+                  return updated;
+                });
                 continue;
               }
 
