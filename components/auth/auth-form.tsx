@@ -94,7 +94,20 @@ export function AuthForm({ mode }: AuthFormProps) {
           throw error;
         }
 
-        console.log('Sign in successful, redirecting...');
+        if (!data.session) {
+          throw new Error('No session returned from sign in');
+        }
+
+        console.log('Sign in successful, session:', data.session);
+        
+        // Wait a moment for session to be saved to storage
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verify session was saved
+        const { data: sessionData } = await supabase.auth.getSession();
+        console.log('Verified session after sign in:', sessionData);
+        
+        console.log('Redirecting to dashboard...');
         router.push("/dashboard");
         router.refresh();
       }
