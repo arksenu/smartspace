@@ -36,7 +36,7 @@ export function Sidebar() {
             <Sparkles className="h-5 w-5 text-primary" />
             <div className="absolute inset-0 animate-pulse-slow bg-primary/20 blur-md" />
           </div>
-          <h1 className="text-xl font-semibold text-white/80 tracking-tight">
+          <h1 className="text-xl font-medium text-white/80 tracking-tight">
             SmartSpace
           </h1>
         </div>
@@ -52,9 +52,9 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 relative",
+                "group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-normal transition-all duration-200 relative",
                 isActive
-                  ? "bg-white/10 text-primary border border-white/5"
+                  ? "bg-white/10 text-primary border border-white/5 font-medium"
                   : "text-[#8C8C92] hover:bg-white/5 hover:text-[#CFCFD3] border border-transparent"
               )}
               style={{ animationDelay: `${index * 50}ms` }}
