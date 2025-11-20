@@ -135,10 +135,15 @@ export async function POST(request: NextRequest) {
       const { runVerifiedRetrieval } = await import("@/lib/vector/filter");
       const verifiedResult = await performanceTracker.measure(
         OperationType.RELEVANCE_SCORING,
-        () => runVerifiedRetrieval(message, user.id, undefined, false),
+        () => runVerifiedRetrieval(message, user.id, undefined, true),  // Force verification when setting is enabled
         { verified_retrieval: true }
       );
       searchResults = verifiedResult.results;
+
+      // Flush metrics after verified retrieval to ensure nested operations are saved
+      await performanceTracker.flushMetrics().catch(() => {
+        // Silently handle flush errors
+      });
 
       // If null-retrieval, log it but continue with empty results
       if (verifiedResult.isNullRetrieval) {

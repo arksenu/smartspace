@@ -93,6 +93,10 @@ export default async function AnalyticsPage() {
                   .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
                   .join(' ');
 
+                // Cache events are instant (0ms) - show only counts
+                const isCacheEvent = stat.operation === OperationType.CACHE_HIT ||
+                  stat.operation === OperationType.CACHE_MISS;
+
                 return (
                   <Card key={stat.operation}>
                     <CardHeader>
@@ -100,27 +104,38 @@ export default async function AnalyticsPage() {
                       <CardDescription>{stat.count} operations</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Average:</span>
-                          <span className="font-mono">{stat.avg_ms}ms</span>
+                      {isCacheEvent ? (
+                        <div className="text-center py-4">
+                          <div className="text-3xl font-bold">
+                            {stat.count}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Total Events
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span>P50:</span>
-                          <span className="font-mono">{stat.p50_ms}ms</span>
+                      ) : (
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Average:</span>
+                            <span className="font-mono">{stat.avg_ms}ms</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>P50:</span>
+                            <span className="font-mono">{stat.p50_ms}ms</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>P95:</span>
+                            <span className="font-mono text-yellow-600">{stat.p95_ms}ms</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>P99:</span>
+                            <span className="font-mono text-red-600">{stat.p99_ms}ms</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{stat.min_ms}ms - {stat.max_ms}ms</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span>P95:</span>
-                          <span className="font-mono text-yellow-600">{stat.p95_ms}ms</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>P99:</span>
-                          <span className="font-mono text-red-600">{stat.p99_ms}ms</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{stat.min_ms}ms - {stat.max_ms}ms</span>
-                        </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
                 );

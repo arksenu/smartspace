@@ -72,6 +72,11 @@ class PerformanceTracker {
       metadata,
     });
 
+    // Log vector search operations for debugging
+    if (operation === OperationType.VECTOR_SEARCH) {
+      console.log(`[Performance] Tracked VECTOR_SEARCH: ${durationMs}ms, queue size: ${this.metrics.length}`);
+    }
+
     // Flush if batch is full (will only work if in request context)
     if (this.metrics.length >= this.batchSize) {
       this.flush().catch(() => {

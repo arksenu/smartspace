@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateEmbeddings } from "@/lib/embeddings";
 import { MIN_SIMILARITY_THRESHOLD } from "./search";
 import type { SearchResult } from "./search";
+import { performanceTracker, OperationType } from "@/lib/analytics/performance";
 
 const K_MAX = 10;
 const K_MIN = 2;
@@ -22,6 +23,9 @@ export async function retrieveTopKChunks(
 
   // Generate query embedding
   const [queryEmbedding] = await generateEmbeddings([query]);
+
+  // Track vector search operation
+  const startTime = Date.now();
 
   // Build the query - retrieve k_max chunks
   const { data, error } = await supabase.rpc("match_document_chunks", {
@@ -71,17 +75,36 @@ export async function retrieveTopKChunks(
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, K_MAX);
 
+    // Track performance (fallback path)
+    performanceTracker.track(OperationType.VECTOR_SEARCH, Date.now() - startTime, {
+      result_count: results.length,
+      k_max: K_MAX,
+      has_document_filter: !!documentId,
+      fallback: true
+    });
+
     return results;
   }
 
   // Map RPC results
-  return (data || []).map((item: any) => ({
+  const results = (data || []).map((item: any) => ({
     chunkId: item.id,
     documentId: item.document_id,
     content: item.content,
     similarity: item.similarity || 0,
     metadata: item.metadata,
   }));
+
+  // Track performance
+  const duration = Date.now() - startTime;
+  console.log(`[Vector Search] Tracking performance: ${duration}ms for ${results.length} results`);
+  performanceTracker.track(OperationType.VECTOR_SEARCH, duration, {
+    result_count: results.length,
+    k_max: K_MAX,
+    has_document_filter: !!documentId
+  });
+
+  return results;
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
