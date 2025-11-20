@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,44 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  
+  // Create client once using useMemo
+  const supabase = useMemo(() => {
+    try {
+      const client = createClient();
+      console.log('Supabase client created successfully');
+      return client;
+    } catch (error) {
+      console.error('Failed to create Supabase client:', error);
+      toast.error("Failed to initialize authentication. Please refresh the page.");
+      return null;
+    }
+  }, []);
 
   const isElectron = typeof window !== "undefined" && (window as any).electronAPI;
+  
+  // Verify Supabase client on mount
+  useEffect(() => {
+    if (supabase) {
+      console.log('Verifying Supabase client...');
+      supabase.auth.getSession().then(({ data, error }) => {
+        console.log('Current session:', { data, error });
+      }).catch((error) => {
+        console.error('Error getting session:', error);
+      });
+    }
+  }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted', { mode, email, hasPassword: !!password });
+    
+    if (!supabase) {
+      console.error('Supabase client not available');
+      toast.error("Authentication service not available. Please refresh the page.");
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -31,7 +63,8 @@ export function AuthForm({ mode }: AuthFormProps) {
           ? `smartspace://auth/callback`
           : `${window.location.origin}/auth/callback`;
         
-        const { error } = await supabase.auth.signUp({
+        console.log('Signing up with email:', email);
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -39,21 +72,34 @@ export function AuthForm({ mode }: AuthFormProps) {
           },
         });
 
-        if (error) throw error;
+        console.log('Sign up response:', { data, error });
+
+        if (error) {
+          console.error('Sign up error:', error);
+          throw error;
+        }
 
         toast.success("Check your email to confirm your account!");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log('Signing in with email:', email);
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) throw error;
+        console.log('Sign in response:', { data, error });
 
-        router.push("/");
+        if (error) {
+          console.error('Sign in error:', error);
+          throw error;
+        }
+
+        console.log('Sign in successful, redirecting...');
+        router.push("/dashboard");
         router.refresh();
       }
     } catch (error: any) {
+      console.error('Auth error:', error);
       toast.error(error.message || "An error occurred");
     } finally {
       setLoading(false);
@@ -72,17 +118,24 @@ export function AuthForm({ mode }: AuthFormProps) {
         ? `smartspace://auth/callback`
         : `${window.location.origin}/auth/callback`;
       
-      const { error } = await supabase.auth.signInWithOtp({
+      console.log('Sending magic link to:', email);
+      const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: redirectTo,
         },
       });
 
-      if (error) throw error;
+      console.log('Magic link response:', { data, error });
+
+      if (error) {
+        console.error('Magic link error:', error);
+        throw error;
+      }
 
       toast.success("Check your email for the magic link!");
     } catch (error: any) {
+      console.error('Magic link error:', error);
       toast.error(error.message || "An error occurred");
     } finally {
       setLoading(false);
