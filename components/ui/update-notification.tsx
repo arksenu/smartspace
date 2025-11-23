@@ -107,20 +107,6 @@ export function UpdateNotification() {
             <p className="text-sm">
               Version {updateDownloaded.version} is ready to install.
             </p>
-            {downloadProgress !== null && (
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Downloaded</span>
-                  <span>{Math.round(downloadProgress)}%</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${downloadProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
             <Button
               className="w-full"
               onClick={() => {

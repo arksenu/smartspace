@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, protocol, Tray, Menu, nativeImage, session } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+const http = require('http');
 const isDev = require('electron-is-dev');
 const { autoUpdater } = require('electron-updater');
 const NextServer = require('./nextServer');
@@ -16,6 +17,7 @@ const logger = new Logger({
 let mainWindow = null;
 let nextServer = null;
 let tray = null;
+let baseUrl = 'http://localhost:3004'; // Default to dev server URL
 const PROTOCOL_NAME = 'smartspace';
 
 // Register schemes as privileged before app is ready for CORS
@@ -138,35 +140,114 @@ function createTray() {
 async function startNextServer() {
   nextServer = new NextServer();
   try {
-    const baseUrl = await nextServer.start();
+    const serverUrl = await nextServer.start();
+    baseUrl = serverUrl; // Store globally for protocol handler
     logger.info(`Next.js server started at ${baseUrl}`);
-    return baseUrl;
+    return serverUrl;
   } catch (error) {
     logger.error('Failed to start Next.js server:', error);
     throw error;
   }
 }
 
-// Handle protocol URLs (smartspace://auth/callback?token=...)
-function handleProtocolUrl(url) {
+// Handle protocol URLs (smartspace://auth/callback?code=... or ?token=...)
+async function handleProtocolUrl(url) {
   if (!url.startsWith(`${PROTOCOL_NAME}://`)) return;
 
   const parsedUrl = new URL(url);
   if (parsedUrl.pathname === '/auth/callback') {
     const params = new URLSearchParams(parsedUrl.search);
+    const code = params.get('code');
     const token = params.get('token');
     const refreshToken = params.get('refresh_token');
     const error = params.get('error');
     const errorDescription = params.get('error_description');
 
-    if (mainWindow) {
-      mainWindow.webContents.send('auth:callback', {
-        token,
-        refreshToken,
-        error,
-        errorDescription,
-      });
-      mainWindow.focus();
+    // If we have a code parameter, exchange it for tokens via the HTTP callback route
+    if (code) {
+      logger.info('Exchanging OAuth code for tokens via HTTP callback');
+      try {
+        const callbackUrl = `${baseUrl}/auth/callback?code=${encodeURIComponent(code)}&electron=true`;
+
+        // Make HTTP request to exchange code for tokens
+        const tokens = await new Promise((resolve, reject) => {
+          http.get(callbackUrl, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+              data += chunk;
+            });
+
+            res.on('end', () => {
+              if (res.statusCode === 200) {
+                try {
+                  const json = JSON.parse(data);
+                  if (json.success && json.session) {
+                    resolve({
+                      token: json.session.access_token,
+                      refreshToken: json.session.refresh_token,
+                    });
+                  } else {
+                    reject(new Error(json.error || 'Failed to exchange code for tokens'));
+                  }
+                } catch (parseError) {
+                  reject(new Error(`Failed to parse response: ${parseError.message}`));
+                }
+              } else {
+                try {
+                  const errorJson = JSON.parse(data);
+                  reject(new Error(errorJson.error || `HTTP ${res.statusCode}: Authentication failed`));
+                } catch {
+                  reject(new Error(`HTTP ${res.statusCode}: Authentication failed`));
+                }
+              }
+            });
+          }).on('error', (err) => {
+            reject(new Error(`Failed to connect to callback route: ${err.message}`));
+          });
+        });
+
+        // Send tokens to renderer process
+        if (mainWindow) {
+          mainWindow.webContents.send('auth:callback', {
+            token: tokens.token,
+            refreshToken: tokens.refreshToken,
+          });
+          mainWindow.focus();
+        }
+      } catch (err) {
+        logger.error('Failed to exchange code for tokens:', err);
+        // Send error to renderer process
+        if (mainWindow) {
+          mainWindow.webContents.send('auth:callback', {
+            error: err.message || 'Failed to exchange code for tokens',
+            errorDescription: err.message,
+          });
+          mainWindow.focus();
+        }
+      }
+    } else if (token && refreshToken) {
+      // Direct token parameters (backward compatibility)
+      if (mainWindow) {
+        mainWindow.webContents.send('auth:callback', {
+          token,
+          refreshToken,
+          error,
+          errorDescription,
+        });
+        mainWindow.focus();
+      }
+    } else if (error) {
+      // Error parameters
+      if (mainWindow) {
+        mainWindow.webContents.send('auth:callback', {
+          error,
+          errorDescription,
+        });
+        mainWindow.focus();
+      }
+    } else {
+      logger.warn('Protocol URL received but no code, token, or error parameters found');
     }
   }
 }
@@ -323,7 +404,9 @@ app.whenReady().then(async () => {
   // Handle protocol URLs on Windows/Linux
   app.on('open-url', (event, url) => {
     event.preventDefault();
-    handleProtocolUrl(url);
+    handleProtocolUrl(url).catch((err) => {
+      logger.error('Error handling protocol URL:', err);
+    });
   });
 
   // macOS specific: Handle app activation
@@ -345,7 +428,9 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
   // Handle protocol URL from command line
   const url = commandLine.find(arg => arg.startsWith(`${PROTOCOL_NAME}://`));
   if (url) {
-    handleProtocolUrl(url);
+    handleProtocolUrl(url).catch((err) => {
+      logger.error('Error handling protocol URL:', err);
+    });
   }
 });
 
@@ -455,7 +540,9 @@ if (process.platform === 'win32') {
   const args = process.argv.slice(1);
   args.forEach((arg) => {
     if (arg.startsWith(`${PROTOCOL_NAME}://`)) {
-      handleProtocolUrl(arg);
+      handleProtocolUrl(arg).catch((err) => {
+        logger.error('Error handling protocol URL:', err);
+      });
     }
   });
 }
