@@ -4,7 +4,6 @@
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
 
 # testing
 /coverage
@@ -15,6 +14,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -36,3 +36,25 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Electron
+/out
+/dist
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.snap
+
+# Cache
+.cache
+*.cache
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# Logs
+/logs/
+*.log

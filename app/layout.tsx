@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ElectronAuthHandler } from "@/components/auth/electron-auth-handler";
+import { UpdateNotification } from "@/components/ui/update-notification";
+import { ElectronDebug } from "@/components/debug/electron-debug";
 
 export const metadata: Metadata = {
   title: "SmartSpace - AI Knowledge Workspace",
@@ -13,7 +16,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ElectronAuthHandler />
+        <UpdateNotification />
+        <ElectronDebug />
+        {children}
+      </body>
     </html>
   );
 }

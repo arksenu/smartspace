@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,35 +17,74 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  
+  // Create client once using useMemo
+  const supabase = useMemo(() => {
+    try {
+      const client = createClient();
+      return client;
+    } catch (error) {
+      toast.error("Failed to initialize authentication. Please refresh the page.");
+      return null;
+    }
+  }, []);
+
+  const isElectron = typeof window !== "undefined" && (window as any).electronAPI;
+  
+  // Verify Supabase client on mount
+  useEffect(() => {
+    if (supabase) {
+      supabase.auth.getSession();
+    }
+  }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      toast.error("Authentication service not available. Please refresh the page.");
+      return;
+    }
+    
     setLoading(true);
 
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const redirectTo = isElectron 
+          ? `smartspace://auth/callback`
+          : `${window.location.origin}/auth/callback`;
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: redirectTo,
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         toast.success("Check your email to confirm your account!");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
-        router.push("/");
-        router.refresh();
+        if (!data.session) {
+          throw new Error('No session returned from sign in');
+        }
+
+        // Wait for session to be saved to storage and cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Use window.location.replace for a full page reload
+        // This ensures the server sees the new cookies
+        window.location.replace("/dashboard");
       }
     } catch (error: any) {
       toast.error(error.message || "An error occurred");
@@ -59,17 +98,28 @@ export function AuthForm({ mode }: AuthFormProps) {
       toast.error("Please enter your email address");
       return;
     }
+    
+    if (!supabase) {
+      toast.error("Authentication service not available. Please refresh the page.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      const redirectTo = isElectron 
+        ? `smartspace://auth/callback`
+        : `${window.location.origin}/auth/callback`;
+      
+      const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectTo,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       toast.success("Check your email for the magic link!");
     } catch (error: any) {

@@ -192,7 +192,7 @@ export default function SettingsPage() {
                       Web Search
                     </Label>
                     <p className="text-xs text-[#8C8C92] leading-relaxed">
-                      Enable OpenAI's built-in web search tool for real-time information
+                      Enable OpenAI&apos;s built-in web search tool for real-time information
                     </p>
                   </div>
                   <Switch
