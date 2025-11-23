@@ -18,6 +18,12 @@ let mainWindow = null;
 let nextServer = null;
 let tray = null;
 let baseUrl = 'http://localhost:3004'; // Default to dev server URL
+let serverReadyResolve;
+let serverReadyReject;
+const serverReadyPromise = new Promise((resolve, reject) => {
+  serverReadyResolve = resolve;
+  serverReadyReject = reject;
+});
 const PROTOCOL_NAME = 'smartspace';
 
 // Register schemes as privileged before app is ready for CORS
@@ -39,7 +45,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false, // Disable for development to allow CORS requests
+      webSecurity: !isDev, // Enable web security in production, disable in development to allow CORS requests
     },
     icon: path.join(__dirname, '..', 'public', 'icon.png'), // Add icon later
     show: false, // Don't show until ready
@@ -142,9 +148,11 @@ async function startNextServer() {
   try {
     const serverUrl = await nextServer.start();
     baseUrl = serverUrl; // Store globally for protocol handler
+    if (serverReadyResolve) serverReadyResolve(serverUrl);
     logger.info(`Next.js server started at ${baseUrl}`);
     return serverUrl;
   } catch (error) {
+    if (serverReadyReject) serverReadyReject(error);
     logger.error('Failed to start Next.js server:', error);
     throw error;
   }
@@ -152,6 +160,13 @@ async function startNextServer() {
 
 // Handle protocol URLs (smartspace://auth/callback?code=... or ?token=...)
 async function handleProtocolUrl(url) {
+  try {
+    await serverReadyPromise;
+  } catch (err) {
+    logger.error('Server failed to start, cannot handle protocol URL', err);
+    return;
+  }
+
   if (!url.startsWith(`${PROTOCOL_NAME}://`)) return;
 
   const parsedUrl = new URL(url);
@@ -346,33 +361,34 @@ ipcMain.handle('updater:quitAndInstall', () => {
 
 // App event handlers
 app.whenReady().then(async () => {
-  // Configure session for CORS
-  const filter = {
-    urls: ['https://*.supabase.co/*', 'http://localhost:*/*']
-  };
-
-  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
-    // Add proper headers for Supabase requests
-    details.requestHeaders['Origin'] = 'http://localhost:3004';
-    if (isDev && details.url.includes('supabase')) {
-      logger.debug('Supabase request:', details.method, details.url.split('?')[0]);
-    }
-    callback({ requestHeaders: details.requestHeaders });
-  });
-
-  session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
-    // Allow CORS for Supabase responses
-    if (details.responseHeaders) {
-      details.responseHeaders['Access-Control-Allow-Origin'] = ['*'];
-      details.responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, DELETE, OPTIONS'];
-      details.responseHeaders['Access-Control-Allow-Headers'] = ['Content-Type, Authorization, apikey, x-client-info'];
-    }
-    callback({ responseHeaders: details.responseHeaders });
-  });
-
-  // Start Next.js server
+  // Start Next.js server first to determine the actual port
   try {
-    const baseUrl = await startNextServer();
+    await startNextServer(); // Updates global baseUrl variable
+
+    // Configure session for CORS after server starts (so we know the actual port)
+    const filter = {
+      urls: ['https://*.supabase.co/*', 'http://localhost:*/*']
+    };
+
+    session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+      // Use dynamic baseUrl instead of hardcoded port
+      // This ensures CORS works even if the server starts on a different port
+      details.requestHeaders['Origin'] = baseUrl;
+      if (isDev && details.url.includes('supabase')) {
+        logger.debug('Supabase request:', details.method, details.url.split('?')[0], `Origin: ${baseUrl}`);
+      }
+      callback({ requestHeaders: details.requestHeaders });
+    });
+
+    session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
+      // Allow CORS for Supabase responses
+      if (details.responseHeaders) {
+        details.responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+        details.responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, DELETE, OPTIONS'];
+        details.responseHeaders['Access-Control-Allow-Headers'] = ['Content-Type, Authorization, apikey, x-client-info'];
+      }
+      callback({ responseHeaders: details.responseHeaders });
+    });
 
     // Create window
     createWindow();
@@ -389,12 +405,8 @@ app.whenReady().then(async () => {
     }
 
     // Load Next.js app
-    if (isDev) {
-      // In dev, assume server is already running
-      mainWindow.loadURL('http://localhost:3004');
-    } else {
-      mainWindow.loadURL(baseUrl);
-    }
+    // Use baseUrl in both dev and prod to handle dynamic port assignment
+    mainWindow.loadURL(baseUrl);
   } catch (error) {
     console.error('Failed to initialize app:', error);
     dialog.showErrorBox('Startup Error', `Failed to start the application.\n\nError: ${error.message}\n\nStack: ${error.stack}`);

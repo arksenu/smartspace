@@ -68,7 +68,11 @@ export function UpdateNotification() {
     electronAPI.checkForUpdates();
 
     return () => {
-      // Cleanup is handled by electronAPI internally
+      // Remove all event listeners to prevent memory leaks
+      electronAPI.removeUpdateAvailable?.();
+      electronAPI.removeUpdateDownloaded?.();
+      electronAPI.removeUpdateProgress?.();
+      electronAPI.removeUpdateError?.();
     };
   }, []);
 
