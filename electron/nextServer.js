@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const http = require('http');
 const path = require('path');
+const { app } = require('electron');
 const isDev = require('electron-is-dev');
 
 class NextServer {
@@ -39,30 +40,61 @@ class NextServer {
         return this.baseUrl;
       }
 
-      // In production, start Next.js server
-      const nextPath = path.join(__dirname, '..', '.next', 'standalone');
-      const serverPath = path.join(nextPath, 'server.js');
 
-      // Check if standalone build exists, otherwise use regular build
+
+
+      // In production, start Next.js server
       const fs = require('fs');
-      const serverExists = fs.existsSync(serverPath);
-      
-      if (!serverExists) {
-        // Use regular Next.js start command
-        const projectRoot = path.join(__dirname, '..');
-        this.serverProcess = spawn('node', ['node_modules/.bin/next', 'start', '-p', this.port.toString()], {
-          cwd: projectRoot,
-          stdio: 'inherit',
-          env: { ...process.env, PORT: this.port.toString() }
-        });
+      let nextPath;
+      let serverPath;
+
+      if (app.isPackaged) {
+        // In production, use the standalone build from extraResources (outside ASAR)
+        nextPath = path.join(process.resourcesPath, 'standalone');
+        serverPath = path.join(nextPath, 'server.js');
+        
+        console.log('Production mode - checking for standalone server');
+        console.log('Resource path:', process.resourcesPath);
+        console.log('Next path:', nextPath);
+        console.log('Server path:', serverPath);
       } else {
-        // Use standalone server
-        this.serverProcess = spawn('node', [serverPath], {
-          cwd: nextPath,
-          stdio: 'inherit',
-          env: { ...process.env, PORT: this.port.toString() }
-        });
+        // In development (not packaged), use the local standalone build
+        nextPath = path.join(__dirname, '..', '.next', 'standalone');
+        serverPath = path.join(nextPath, 'server.js');
+        
+        console.log('Development mode - checking for standalone server');
+        console.log('Next path:', nextPath);
+        console.log('Server path:', serverPath);
       }
+
+      // Check if standalone build exists
+      const serverExists = fs.existsSync(serverPath);
+      console.log('Server exists:', serverExists);
+
+      if (!serverExists) {
+        const errorMsg = `Next.js standalone server not found at: ${serverPath}
+Please ensure you've built the Next.js app with 'npm run build' before packaging.`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      // Use the standalone server
+      // Use fork to run the server in a separate Node.js process
+      const { fork } = require('child_process');
+      
+      console.log('Starting Next.js standalone server...');
+      this.serverProcess = fork(serverPath, [], {
+        cwd: nextPath,
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          PORT: this.port.toString(),
+          HOSTNAME: 'localhost',
+          NODE_ENV: 'production'
+        },
+        // Important: Set execArgv to empty array to avoid inheriting Electron's arguments
+        execArgv: []
+      });
 
       // Wait for server to be ready
       await this.waitForServer();

@@ -1,5 +1,9 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Singleton instance for Electron client
+let electronClientInstance: SupabaseClient | null = null;
 
 // Check if we're in Electron
 function isElectron() {
@@ -119,13 +123,16 @@ export function createClient() {
     throw new Error('Missing Supabase configuration. Please check your environment variables.');
   }
 
-  // In Electron, use the standard Supabase client
-  // It will use localStorage by default, and cookies will work for server-side access
-  // since Electron runs Next.js on localhost
+  // In Electron, use a singleton client to prevent multiple instances
+  // It will use localStorage by default, and we need to ensure cookies are set for server-side access
   if (isElectron()) {
-    console.log('Creating Supabase client for Electron');
-    // Use standard client - it will use localStorage and cookies automatically
-    return createSupabaseClient(
+    // Return existing instance if available
+    if (electronClientInstance) {
+      return electronClientInstance;
+    }
+    
+    // Create and cache new instance
+    electronClientInstance = createSupabaseClient(
       supabaseUrl,
       supabaseAnonKey,
       {
@@ -133,14 +140,79 @@ export function createClient() {
           autoRefreshToken: true,
           persistSession: true,
           detectSessionInUrl: true,
-          // Don't override storage - let Supabase use default (localStorage + cookies)
+          storage: {
+            getItem: (key: string) => {
+              // First try localStorage
+              const value = localStorage.getItem(key);
+              if (value) return value;
+              
+              // Then try cookies
+              const cookies = document.cookie.split(';');
+              for (const cookie of cookies) {
+                const [name, val] = cookie.trim().split('=');
+                if (name === key) {
+                  return decodeURIComponent(val);
+                }
+              }
+              return null;
+            },
+            setItem: (key: string, value: string) => {
+              // Set in localStorage
+              localStorage.setItem(key, value);
+              
+              // Also set as cookie for server-side access
+              // Use path=/ and no domain to ensure it works on localhost
+              document.cookie = `${key}=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax`;
+              
+              // Special handling for auth tokens - also set the individual cookie parts
+              // Supabase expects cookies with specific names
+              if (key.includes('auth-token')) {
+                try {
+                  const parsed = JSON.parse(value);
+                  // Get the project reference from the URL
+                  const urlMatch = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/);
+                  const projectRef = urlMatch ? urlMatch[1] : '';
+                  
+                  if (parsed.access_token) {
+                    // Set both generic and project-specific cookie names
+                    document.cookie = `sb-access-token=${encodeURIComponent(parsed.access_token)}; path=/; max-age=31536000; SameSite=Lax`;
+                    if (projectRef) {
+                      document.cookie = `sb-${projectRef}-auth-token=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax`;
+                    }
+                  }
+                  if (parsed.refresh_token) {
+                    document.cookie = `sb-refresh-token=${encodeURIComponent(parsed.refresh_token)}; path=/; max-age=31536000; SameSite=Lax`;
+                  }
+                } catch (e) {
+                  // Not a JSON token, ignore
+                }
+              }
+            },
+            removeItem: (key: string) => {
+              localStorage.removeItem(key);
+              document.cookie = `${key}=; path=/; max-age=0`;
+              // Also remove the individual cookie parts
+              document.cookie = `sb-access-token=; path=/; max-age=0`;
+              document.cookie = `sb-refresh-token=; path=/; max-age=0`;
+            },
+          },
+        },
+        global: {
+          // Use native fetch but ensure it works in Electron environment
+          fetch: (...args) => {
+            return fetch(...args).catch((error) => {
+              console.error('Fetch error in Electron:', error);
+              throw error;
+            });
+          },
         },
       }
     );
+    
+    return electronClientInstance;
   }
 
   // In browser, use SSR client (uses cookies)
-  console.log('Creating Supabase client for browser');
   return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 

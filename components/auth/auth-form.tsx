@@ -22,10 +22,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   const supabase = useMemo(() => {
     try {
       const client = createClient();
-      console.log('Supabase client created successfully');
       return client;
     } catch (error) {
-      console.error('Failed to create Supabase client:', error);
       toast.error("Failed to initialize authentication. Please refresh the page.");
       return null;
     }
@@ -36,21 +34,13 @@ export function AuthForm({ mode }: AuthFormProps) {
   // Verify Supabase client on mount
   useEffect(() => {
     if (supabase) {
-      console.log('Verifying Supabase client...');
-      supabase.auth.getSession().then(({ data, error }) => {
-        console.log('Current session:', { data, error });
-      }).catch((error) => {
-        console.error('Error getting session:', error);
-      });
+      supabase.auth.getSession();
     }
   }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted', { mode, email, hasPassword: !!password });
-    
     if (!supabase) {
-      console.error('Supabase client not available');
       toast.error("Authentication service not available. Please refresh the page.");
       return;
     }
@@ -62,8 +52,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         const redirectTo = isElectron 
           ? `smartspace://auth/callback`
           : `${window.location.origin}/auth/callback`;
-        
-        console.log('Signing up with email:', email);
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -72,25 +60,18 @@ export function AuthForm({ mode }: AuthFormProps) {
           },
         });
 
-        console.log('Sign up response:', { data, error });
-
         if (error) {
-          console.error('Sign up error:', error);
           throw error;
         }
 
         toast.success("Check your email to confirm your account!");
       } else {
-        console.log('Signing in with email:', email);
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        console.log('Sign in response:', { data, error });
-
         if (error) {
-          console.error('Sign in error:', error);
           throw error;
         }
 
@@ -98,21 +79,14 @@ export function AuthForm({ mode }: AuthFormProps) {
           throw new Error('No session returned from sign in');
         }
 
-        console.log('Sign in successful, session:', data.session);
+        // Wait for session to be saved to storage and cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Wait a moment for session to be saved to storage
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Verify session was saved
-        const { data: sessionData } = await supabase.auth.getSession();
-        console.log('Verified session after sign in:', sessionData);
-        
-        console.log('Redirecting to dashboard...');
-        router.push("/dashboard");
-        router.refresh();
+        // Use window.location.replace for a full page reload
+        // This ensures the server sees the new cookies
+        window.location.replace("/dashboard");
       }
     } catch (error: any) {
-      console.error('Auth error:', error);
       toast.error(error.message || "An error occurred");
     } finally {
       setLoading(false);
@@ -124,6 +98,11 @@ export function AuthForm({ mode }: AuthFormProps) {
       toast.error("Please enter your email address");
       return;
     }
+    
+    if (!supabase) {
+      toast.error("Authentication service not available. Please refresh the page.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -131,7 +110,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         ? `smartspace://auth/callback`
         : `${window.location.origin}/auth/callback`;
       
-      console.log('Sending magic link to:', email);
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
@@ -139,16 +117,12 @@ export function AuthForm({ mode }: AuthFormProps) {
         },
       });
 
-      console.log('Magic link response:', { data, error });
-
       if (error) {
-        console.error('Magic link error:', error);
         throw error;
       }
 
       toast.success("Check your email for the magic link!");
     } catch (error: any) {
-      console.error('Magic link error:', error);
       toast.error(error.message || "An error occurred");
     } finally {
       setLoading(false);

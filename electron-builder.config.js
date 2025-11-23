@@ -1,6 +1,3 @@
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
-
 module.exports = {
   appId: 'com.smartspace.app',
   productName: 'SmartSpace',
@@ -10,29 +7,25 @@ module.exports = {
   },
   files: [
     'electron/**/*',
-    '.next/standalone/**/*',
-    '.next/static/**/*',
-    'public/**/*',
     'package.json',
-    'node_modules/**/*',
-    '!node_modules/.cache/**/*',
-    '!node_modules/electron/**/*',
-    '!node_modules/electron-builder/**/*',
   ],
+  // Configure ASAR options - unpack files that need to be executed
+  asar: {
+    smartUnpack: true,
+  },
+  asarUnpack: [
+    'electron/**/*',
+  ],
+  // Copy the standalone Next.js build as extra resources (outside ASAR)
   extraResources: [
     {
       from: '.next/standalone',
-      to: 'app/.next/standalone',
+      to: 'standalone',
       filter: ['**/*'],
     },
     {
       from: '.next/static',
-      to: 'app/.next/static',
-      filter: ['**/*'],
-    },
-    {
-      from: 'public',
-      to: 'app/public',
+      to: 'standalone/.next/static',
       filter: ['**/*'],
     },
   ],

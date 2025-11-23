@@ -1,14 +1,28 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, Tray, Menu, nativeImage, session } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const isDev = require('electron-is-dev');
 const { autoUpdater } = require('electron-updater');
 const NextServer = require('./nextServer');
+const Logger = require('./logger');
+
+// Initialize logger with file logging in development or test mode
+const logger = new Logger({
+  enabled: true,
+  logToFile: isDev || process.env.ELECTRON_PROD_TEST === '1', // Log in dev or test mode
+  prefix: '[Electron Main]'
+});
 
 let mainWindow = null;
 let nextServer = null;
 let tray = null;
 const PROTOCOL_NAME = 'smartspace';
+
+// Register schemes as privileged before app is ready for CORS
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'http', privileges: { standard: true, secure: true, corsEnabled: true } },
+  { scheme: 'https', privileges: { standard: true, secure: true, corsEnabled: true } }
+]);
 
 // Handle protocol for OAuth callbacks
 app.setAsDefaultProtocolClient(PROTOCOL_NAME);
@@ -23,7 +37,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true,
+      webSecurity: false, // Disable for development to allow CORS requests
     },
     icon: path.join(__dirname, '..', 'public', 'icon.png'), // Add icon later
     show: false, // Don't show until ready
@@ -32,9 +46,10 @@ function createWindow() {
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
+
     // Focus window on creation
-    if (isDev) {
+    // Don't open DevTools in production test mode
+    if (isDev && !process.env.ELECTRON_PROD_TEST) {
       mainWindow.webContents.openDevTools();
     }
   });
@@ -74,7 +89,7 @@ function createTray() {
   // Create a simple tray icon (you'll need to add an actual icon file)
   const iconPath = path.join(__dirname, '..', 'public', 'icon-tray.png');
   let trayIcon = nativeImage.createEmpty();
-  
+
   try {
     trayIcon = nativeImage.createFromPath(iconPath);
   } catch (error) {
@@ -83,7 +98,7 @@ function createTray() {
   }
 
   tray = new Tray(trayIcon);
-  
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show SmartSpace',
@@ -105,7 +120,7 @@ function createTray() {
 
   tray.setToolTip('SmartSpace');
   tray.setContextMenu(contextMenu);
-  
+
   tray.on('click', () => {
     if (mainWindow) {
       if (mainWindow.isVisible()) {
@@ -124,10 +139,10 @@ async function startNextServer() {
   nextServer = new NextServer();
   try {
     const baseUrl = await nextServer.start();
-    console.log(`Next.js server started at ${baseUrl}`);
+    logger.info(`Next.js server started at ${baseUrl}`);
     return baseUrl;
   } catch (error) {
-    console.error('Failed to start Next.js server:', error);
+    logger.error('Failed to start Next.js server:', error);
     throw error;
   }
 }
@@ -185,7 +200,7 @@ ipcMain.handle('fs:readFile', async (event, filePath) => {
     const stats = await fs.stat(filePath);
     const fileName = path.basename(filePath);
     const ext = path.extname(filePath).toLowerCase();
-    
+
     // Determine MIME type
     const mimeTypes = {
       '.pdf': 'application/pdf',
@@ -194,7 +209,7 @@ ipcMain.handle('fs:readFile', async (event, filePath) => {
       '.doc': 'application/msword',
       '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
-    
+
     return {
       name: fileName,
       path: filePath,
@@ -231,44 +246,67 @@ ipcMain.handle('app:getVersion', () => {
 
 // Auto-updater handlers
 ipcMain.handle('updater:check', () => {
-  if (!isDev) {
-    autoUpdater.checkForUpdates();
+  if (!isDev && !process.env.ELECTRON_PROD_TEST && typeof autoUpdater.checkForUpdates === 'function') {
+    autoUpdater.checkForUpdates().catch(err => {
+      logger.debug('Update check failed:', err.message);
+    });
+  } else {
+    logger.debug('Update check skipped (dev/test mode)');
   }
 });
 
 ipcMain.handle('updater:quitAndInstall', () => {
-  autoUpdater.quitAndInstall();
+  if (!isDev && !process.env.ELECTRON_PROD_TEST && typeof autoUpdater.quitAndInstall === 'function') {
+    autoUpdater.quitAndInstall();
+  } else {
+    logger.debug('Quit and install skipped (dev/test mode)');
+  }
 });
 
 // App event handlers
 app.whenReady().then(async () => {
-  // Register protocol handler
-  protocol.registerHttpProtocol('http', (request, callback) => {
-    callback(request);
+  // Configure session for CORS
+  const filter = {
+    urls: ['https://*.supabase.co/*', 'http://localhost:*/*']
+  };
+
+  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+    // Add proper headers for Supabase requests
+    details.requestHeaders['Origin'] = 'http://localhost:3004';
+    if (isDev && details.url.includes('supabase')) {
+      logger.debug('Supabase request:', details.method, details.url.split('?')[0]);
+    }
+    callback({ requestHeaders: details.requestHeaders });
   });
 
-  protocol.registerHttpProtocol('https', (request, callback) => {
-    callback(request);
+  session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
+    // Allow CORS for Supabase responses
+    if (details.responseHeaders) {
+      details.responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+      details.responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, DELETE, OPTIONS'];
+      details.responseHeaders['Access-Control-Allow-Headers'] = ['Content-Type, Authorization, apikey, x-client-info'];
+    }
+    callback({ responseHeaders: details.responseHeaders });
   });
 
   // Start Next.js server
   try {
     const baseUrl = await startNextServer();
-    
+
     // Create window
     createWindow();
-    
+
     // Create system tray (Windows/Linux)
     if (process.platform !== 'darwin') {
       createTray();
     }
-    
+
     // macOS dock integration
     if (process.platform === 'darwin') {
       app.dock.setBadge('');
       // You can set a custom dock menu here if needed
     }
-    
+
     // Load Next.js app
     if (isDev) {
       // In dev, assume server is already running
@@ -278,7 +316,7 @@ app.whenReady().then(async () => {
     }
   } catch (error) {
     console.error('Failed to initialize app:', error);
-    dialog.showErrorBox('Startup Error', 'Failed to start the application. Please try again.');
+    dialog.showErrorBox('Startup Error', `Failed to start the application.\n\nError: ${error.message}\n\nStack: ${error.stack}`);
     app.quit();
   }
 
@@ -339,56 +377,78 @@ app.on('before-quit', async () => {
 });
 
 // Auto-updater configuration
-if (!isDev) {
-  autoUpdater.setAutoDownload(true);
-  autoUpdater.setAutoInstallOnAppQuit(true);
-  
-  // Check for updates on startup (after a delay)
-  setTimeout(() => {
-    autoUpdater.checkForUpdates();
-  }, 5000);
-  
-  // Check for updates every 4 hours
-  setInterval(() => {
-    autoUpdater.checkForUpdates();
-  }, 4 * 60 * 60 * 1000);
+// Only enable auto-updater in production builds (not in dev or test mode)
+if (!isDev && process.env.NODE_ENV === 'production' && !process.env.ELECTRON_IS_DEV) {
+  try {
+    // Check if auto-updater methods are available
+    if (typeof autoUpdater.setAutoDownload === 'function') {
+      autoUpdater.setAutoDownload(true);
+    }
+    if (typeof autoUpdater.setAutoInstallOnAppQuit === 'function') {
+      autoUpdater.setAutoInstallOnAppQuit(true);
+    }
+
+    // Check for updates on startup (after a delay)
+    setTimeout(() => {
+      if (typeof autoUpdater.checkForUpdates === 'function') {
+        autoUpdater.checkForUpdates().catch(err => {
+          logger.debug('Auto-updater check failed:', err.message);
+        });
+      }
+    }, 5000);
+
+    // Check for updates every 4 hours
+    setInterval(() => {
+      if (typeof autoUpdater.checkForUpdates === 'function') {
+        autoUpdater.checkForUpdates().catch(err => {
+          logger.debug('Auto-updater check failed:', err.message);
+        });
+      }
+    }, 4 * 60 * 60 * 1000);
+  } catch (error) {
+    logger.debug('Auto-updater initialization skipped:', error.message);
+  }
+} else {
+  logger.info('Auto-updater disabled (dev/test mode)');
 }
 
-// Auto-updater events
-autoUpdater.on('checking-for-update', () => {
-  console.log('Checking for updates...');
-});
+// Auto-updater events (only in production, not in dev/test mode)
+if (!isDev && process.env.NODE_ENV === 'production' && !process.env.ELECTRON_IS_DEV && !process.env.ELECTRON_PROD_TEST) {
+  autoUpdater.on('checking-for-update', () => {
+    logger.info('Checking for updates...');
+  });
 
-autoUpdater.on('update-available', (info) => {
-  console.log('Update available:', info.version);
-  if (mainWindow) {
-    mainWindow.webContents.send('updater:update-available', info);
-  }
-});
+  autoUpdater.on('update-available', (info) => {
+    logger.info('Update available:', info.version);
+    if (mainWindow) {
+      mainWindow.webContents.send('updater:update-available', info);
+    }
+  });
 
-autoUpdater.on('update-not-available', (info) => {
-  console.log('Update not available:', info.version);
-});
+  autoUpdater.on('update-not-available', (info) => {
+    logger.info('Update not available:', info.version);
+  });
 
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('Update downloaded:', info.version);
-  if (mainWindow) {
-    mainWindow.webContents.send('updater:update-downloaded', info);
-  }
-});
+  autoUpdater.on('update-downloaded', (info) => {
+    logger.info('Update downloaded:', info.version);
+    if (mainWindow) {
+      mainWindow.webContents.send('updater:update-downloaded', info);
+    }
+  });
 
-autoUpdater.on('download-progress', (progressObj) => {
-  if (mainWindow) {
-    mainWindow.webContents.send('updater:download-progress', progressObj);
-  }
-});
+  autoUpdater.on('download-progress', (progressObj) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('updater:download-progress', progressObj);
+    }
+  });
 
-autoUpdater.on('error', (error) => {
-  console.error('Auto-updater error:', error);
-  if (mainWindow) {
-    mainWindow.webContents.send('updater:error', error.message);
-  }
-});
+  autoUpdater.on('error', (error) => {
+    logger.error('Auto-updater error:', error);
+    if (mainWindow) {
+      mainWindow.webContents.send('updater:error', error.message);
+    }
+  });
+}
 
 // Handle protocol URLs on Windows (via command line)
 if (process.platform === 'win32') {

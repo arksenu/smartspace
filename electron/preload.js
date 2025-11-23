@@ -1,8 +1,21 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const Store = require('electron-store');
 
-// Initialize electron-store for secure storage
-const store = new Store();
+// Try to initialize electron-store, fallback to in-memory storage if it fails
+let store = null;
+let memoryStore = {};
+
+try {
+  const Store = require('electron-store');
+  store = new Store();
+} catch (error) {
+  console.warn('electron-store not available, using in-memory storage:', error.message);
+  // Fallback to in-memory storage
+  store = {
+    get: (key) => memoryStore[key] || null,
+    set: (key, value) => { memoryStore[key] = value; },
+    delete: (key) => { delete memoryStore[key]; }
+  };
+}
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
