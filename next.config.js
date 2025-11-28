@@ -11,6 +11,27 @@ const nextConfig = {
   images: {
     unoptimized: process.env.ELECTRON_BUILD === 'true',
   },
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: process.env.ALLOWED_ORIGINS || 'http://localhost:3000',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
+          },
+        ],
+      },
+    ];
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Ensure canvas is treated as optional (used by some PDF libraries)
@@ -19,7 +40,7 @@ const nextConfig = {
         canvas: 'canvas',
       });
     }
-    
+
     // Disable webpack's fallback for Node.js modules in the browser
     config.resolve.fallback = {
       ...config.resolve.fallback,
@@ -27,10 +48,9 @@ const nextConfig = {
       path: false,
       crypto: false,
     };
-    
+
     return config;
   },
 }
 
 module.exports = nextConfig
-
